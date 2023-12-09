@@ -4,6 +4,7 @@ use slotmap::{SecondaryMap, SlotMap};
 
 use anyhow::{anyhow, Result};
 
+use crate::node::*;
 use crate::graph::*;
 use crate::values::*;
 

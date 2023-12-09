@@ -3,7 +3,7 @@ use anyhow::Result;
 use node_engine::*;
 
 fn build_sub_graph(
-  node: &Box<dyn NodeImpl>,
+  node: &NodeState,
   graph: &mut NodeGraph,
   depth: usize,
 ) -> Result<(usize, NodeId)> {

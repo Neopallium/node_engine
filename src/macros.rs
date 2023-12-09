@@ -565,7 +565,7 @@ macro_rules! impl_node {
           $(
             def.categories = $node_categories.iter().map(|c| c.to_string()).collect();
           )?
-          def.uuid = uuid::Uuid::new_v5(&$crate::graph::NAMESPACE_NODE_IMPL, $node_name.as_bytes());
+          def.uuid = uuid::Uuid::new_v5(&$crate::node::NAMESPACE_NODE_IMPL, $node_name.as_bytes());
           def.inputs = [
             $( InputDefinition::typed::<$field_input_ty>(stringify!($field_input_name)) ),*
           ].into();

@@ -2,6 +2,7 @@ use slotmap::SecondaryMap;
 
 use anyhow::{anyhow, Result};
 
+use crate::node::*;
 use crate::graph::*;
 use crate::values::*;
 
