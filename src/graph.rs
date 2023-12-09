@@ -82,10 +82,10 @@ impl NodeRegistry {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EditorState {
-  size: mint::Vector2<f32>,
-  origin: mint::Vector2<f32>,
+  size: emath::Vec2,
+  origin: emath::Vec2,
   zoom: f32,
-  scroll_offset: mint::Vector2<f32>,
+  scroll_offset: emath::Vec2,
   // stats
   #[serde(skip)]
   render_nodes: Duration,
@@ -97,14 +97,13 @@ pub struct EditorState {
 
 impl Default for EditorState {
   fn default() -> Self {
-    let size = glam::Vec2::new(1000.0, 1000.0);
+    let size = emath::vec2(1000.0, 1000.0);
     let origin = size / 2.0;
     Self {
-      size: size.into(),
-      origin: origin.into(),
+      size,
+      origin,
       zoom: 0.5,
-      //scroll_offset: (origin - glam::Vec2::new(450., 250.)).into(),
-      scroll_offset: glam::Vec2::new(50., 50.).into(),
+      scroll_offset: origin - emath::vec2(450., 250.),
       render_nodes: Default::default(),
       render_connections: Default::default(),
       last_update: None,
@@ -125,14 +124,14 @@ impl EditorState {
     self.render_connections = (self.render_connections + render_connections) / 2;
   }
 
-  fn get_zoomed(&self) -> (egui::Vec2, egui::Vec2, egui::Vec2, f32) {
+  fn get_zoomed(&self) -> (emath::Vec2, emath::Vec2, emath::Vec2, f32) {
     let mut size = self.size;
     let mut origin = self.origin;
     let mut scroll_offset = self.scroll_offset;
     size.zoom(self.zoom);
     origin.zoom(self.zoom);
     scroll_offset.zoom(self.zoom);
-    (size.into(), origin.into(), scroll_offset.into(), self.zoom)
+    (size, origin, scroll_offset, self.zoom)
   }
 }
 
@@ -306,7 +305,7 @@ impl NodeGraph {
       let now = Instant::now();
       // Render nodes.
       for (id, node) in &mut self.nodes {
-        node.ui_at(ui, origin.into(), id);
+        node.ui_at(ui, origin, id);
       }
       let render_nodes = now.elapsed();
 
@@ -380,6 +379,6 @@ impl NodeGraph {
       ui.set_node_style(old_node_style);
     });
     // Save scroll offset and de-zoom it.
-    self.editor.scroll_offset = (resp.state.offset / zoom).into();
+    self.editor.scroll_offset = resp.state.offset / zoom;
   }
 }

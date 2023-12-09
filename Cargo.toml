@@ -19,7 +19,7 @@ serde = [
 	"indexmap/serde",
 	"slotmap/serde",
 	"glam/serde",
-	"mint/serde",
+	"emath/serde",
 ]
 egui = ["dep:egui", "egui_extras"]
 
@@ -30,7 +30,8 @@ env_logger = "0.10"
 lazy_static = "1.4.0"
 thiserror = "1.0"
 
-egui = { version = "0.23.0", optional = true, features = ["mint"] }
+emath = { version = "0.23" }
+egui = { version = "0.23.0", optional = true }
 egui_extras = { version = "0.23.0", optional = true }
 
 serde = { version = "1", optional = true, features = ["derive", "rc"] }
@@ -38,15 +39,14 @@ serde_json = { version = "1", optional = true }
 typetag = { version = "0.2", optional = true }
 heck = "0.4"
 
-mint = { version = "0.5" }
-glam = { version = "0.24", features = ["mint"] }
+glam = { version = "0.24" }
 slotmap = "1.0"
 indexmap = "2.0"
 uuid = { version = "1.4", features = ["v4", "v5", "serde"] }
 
 [dev-dependencies]
 criterion = "0.5"
-eframe = "0.23"
+eframe = { version = "0.23", features = ["persistence"] }
 
 [[bench]]
 name = "node_graph"

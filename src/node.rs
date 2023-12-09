@@ -324,8 +324,8 @@ pub struct NodeState {
   uuid: Uuid,
   name: String,
   node: Box<dyn NodeImpl>,
-  pub position: mint::Vector2<f32>,
-  size: mint::Vector2<f32>,
+  pub position: emath::Vec2,
+  size: emath::Vec2,
   #[serde(skip)]
   updated: bool,
   selected: bool,
@@ -394,12 +394,12 @@ impl NodeState {
 
 #[cfg(feature = "egui")]
 impl NodeState {
-  fn get_zoomed(&self, zoom: f32) -> (egui::Vec2, egui::Vec2) {
+  fn get_zoomed(&self, zoom: f32) -> (emath::Vec2, emath::Vec2) {
     let mut position = self.position;
     let mut size = self.size;
     position.zoom(zoom);
     size.zoom(zoom);
-    (position.into(), size.into())
+    (position, size)
   }
 
   pub fn ui_at(&mut self, ui: &mut egui::Ui, offset: egui::Vec2, id: NodeId) {
@@ -414,7 +414,7 @@ impl NodeState {
     // Dragged or clicked.
     let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
     if resp.dragged() {
-      self.position = ((position + resp.drag_delta()) / zoom).into();
+      self.position = (position + resp.drag_delta()) / zoom;
       resp.scroll_to_me(None);
     }
     if resp.clicked() {
@@ -434,7 +434,7 @@ impl NodeState {
 
     // Update node size.
     let rect = child_ui.min_rect();
-    self.size = (rect.size() / zoom).into();
+    self.size = rect.size() / zoom;
   }
 
   fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle, id: NodeId) {

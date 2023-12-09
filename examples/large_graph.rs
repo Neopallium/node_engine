@@ -1,5 +1,3 @@
-use glam::Vec2;
-
 use node_engine::*;
 
 const X_OFFSET: f32 = 250.0;
@@ -8,14 +6,14 @@ const Y_OFFSET: f32 = 50.0;
 fn build_sub_graph(
   node: &NodeState,
   graph: &mut NodeGraph,
-  position: Vec2,
+  position: emath::Vec2,
   depth: usize,
 ) -> anyhow::Result<(usize, NodeId)> {
-  let position = position - Vec2::new(X_OFFSET, 0.);
+  let position = position - emath::vec2(X_OFFSET, 0.);
   let depth = depth - 1;
   let (sub_size, a, b) = if depth > 0 {
-    let a_pos = position - Vec2::new(0., Y_OFFSET);
-    let b_pos = position + Vec2::new(0., Y_OFFSET);
+    let a_pos = position - emath::vec2(0., Y_OFFSET);
+    let b_pos = position + emath::vec2(0., Y_OFFSET);
     let (a_size, a) = build_sub_graph(node, graph, a_pos, depth)?;
     let (b_size, b) = build_sub_graph(node, graph, b_pos, depth)?;
     (a_size + b_size, Input::from(a), Input::from(b))
@@ -23,7 +21,7 @@ fn build_sub_graph(
     (0, Input::from(1.0), Input::from(1.0))
   };
   let mut node = node.duplicate();
-  node.position = position.into();
+  node.position = position;
   let id = graph.add(node);
   graph.set_node_input(id, "A", a)?;
   graph.set_node_input(id, "B", b)?;

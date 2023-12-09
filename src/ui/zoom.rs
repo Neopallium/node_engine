@@ -23,21 +23,6 @@ impl Zoom for Vec2 {
     }
 }
 
-impl Zoom for mint::Vector2<f32> {
-    #[inline(always)]
-    fn zoom(&mut self, zoom: f32) {
-        self.x *= zoom;
-        self.y *= zoom;
-    }
-}
-
-impl Zoom for glam::Vec2 {
-    #[inline(always)]
-    fn zoom(&mut self, zoom: f32) {
-        *self *= zoom;
-    }
-}
-
 impl Zoom for Rounding {
     #[inline(always)]
     fn zoom(&mut self, zoom: f32) {
