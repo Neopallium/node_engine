@@ -78,25 +78,15 @@ mod tests {
     println!("Build node graph");
     let mut graph = NodeGraph::new();
     let scalar = reg.new_by_name("Scalar Math").expect("Scalar Math node");
-    //let scalar = ScalarMath::new();
-    let node1 = graph.add(scalar.clone());
-    {
-      let node = graph.get_mut(node1)?;
-      node.set_input("A", 1.0.into())?;
-      node.set_input("B", 2.0.into())?;
-    }
-    let node2 = graph.add(scalar.clone());
-    {
-      let node = graph.get_mut(node2)?;
-      node.set_input("A", node1.into())?;
-      node.set_input("B", 2.0.into())?;
-    }
-    let node3 = graph.add(scalar.clone());
-    {
-      let node = graph.get_mut(node3)?;
-      node.set_input("A", node1.into())?;
-      node.set_input("B", node2.into())?;
-    }
+    let node1 = graph.add(scalar.duplicate());
+    graph.set_node_input(node1, "A", 1.0.into())?;
+    graph.set_node_input(node1, "B", 2.0.into())?;
+    let node2 = graph.add(scalar.duplicate());
+    graph.set_node_input(node2, "A", node1.into())?;
+    graph.set_node_input(node2, "B", 2.0.into())?;
+    let node3 = graph.add(scalar.duplicate());
+    graph.set_node_input(node3, "A", node1.into())?;
+    graph.set_node_input(node3, "B", node2.into())?;
     graph.set_output(Some(node3));
 
     println!("Dynamic eval graph (no compile)");

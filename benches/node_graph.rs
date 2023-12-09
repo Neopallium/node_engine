@@ -35,9 +35,8 @@ fn build_sub_graph(
     (0, input.clone(), input.clone())
   };
   let id = graph.add(node.clone());
-  let node = graph.get_mut(id).expect("node");
-  node.set_input("A", a).expect("set input");
-  node.set_input("B", b).expect("set input");
+  graph.set_node_input(id, "A", a).expect("set input");
+  graph.set_node_input(id, "B", b).expect("set input");
 
   (sub_size + 1, id)
 }
@@ -52,9 +51,8 @@ fn build_graph(
 
   let input = if common_input {
     let id = graph.add(scalar.clone());
-    let node = graph.get_mut(id).expect("node");
-    node.set_input("A", Input::from(1.0)).expect("set input");
-    node.set_input("B", Input::from(0.0)).expect("set input");
+    graph.set_node_input(id, "A", Input::from(1.0)).expect("set input");
+    graph.set_node_input(id, "B", Input::from(0.0)).expect("set input");
     Input::from(id)
   } else {
     Input::from(1.0)

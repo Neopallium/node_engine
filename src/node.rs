@@ -8,7 +8,18 @@ use uuid::Uuid;
 
 use anyhow::{anyhow, Result};
 
+#[cfg(feature = "egui")]
+use egui_extras::{StripBuilder, Size};
+
 use crate::*;
+#[cfg(feature = "egui")]
+use crate::ui::{
+  NodeGraphAccess,
+  NodeStyle,
+  NodeSocket,
+  NodeSocketId,
+  Zoom,
+};
 
 slotmap::new_key_type! {
   /// Node Id
@@ -23,25 +34,45 @@ pub fn node_idx(id: NodeId) -> u64 {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InputId(pub NodeId, pub u32);
+pub struct InputId {
+  pub node: NodeId,
+  pub idx: u32,
+}
 
 impl InputId {
+  pub fn new(node: NodeId, idx: u32) -> Self {
+    Self {
+      node,
+      idx,
+    }
+  }
+
   pub fn node(&self) -> NodeId {
-    self.0
+    self.node
   }
 
   pub fn key(&self) -> InputKey {
-    self.1.into()
+    self.idx.into()
   }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OutputId(pub NodeId, pub u32);
+pub struct OutputId {
+  pub node: NodeId,
+  pub idx: u32,
+}
 
 impl OutputId {
+  pub fn new(node: NodeId, idx: u32) -> Self {
+    Self {
+      node,
+      idx,
+    }
+  }
+
   pub fn node(&self) -> NodeId {
-    self.0
+    self.node
   }
 }
 
@@ -97,18 +128,80 @@ pub trait NodeImpl: fmt::Debug {
   }
 
   #[cfg(feature = "egui")]
-  fn node_ui(&mut self, _ui: &mut egui::Ui, _offset: egui::Vec2) {
-    panic!("Node doesn't support egui");
+  fn ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
+    let def = self.def();
+    let input_count = def.inputs.len();
+    let output_count = def.outputs.len();
+    let mut columns = 0;
+    if input_count > 0 {
+      columns += 1;
+    }
+    if output_count > 0 {
+      columns += 1;
+    }
+
+    // Frame for inputs/outputs
+    egui::Frame::none()
+      .fill(egui::Color32::from_gray(63))
+      .show(ui, |ui| {
+        ui.columns(columns, |columns| {
+          let mut col = 0;
+          if input_count > 0 {
+            // Inputs frame.
+            egui::Frame::none()
+              .fill(egui::Color32::from_gray(80))
+              .show(&mut columns[col], |ui| {
+                ui.set_min_size(ui.available_size());
+                ui.vertical(|ui| {
+                  self.inputs_ui(ui, id);
+                });
+              });
+            col += 1;
+          }
+          if output_count > 0 {
+            // Outputs frame.
+            egui::Frame::none()
+              .fill(egui::Color32::from_gray(63))
+              .show(&mut columns[col], |ui| {
+                ui.set_min_size(ui.available_size());
+                ui.vertical(|ui| {
+                  self.outputs_ui(ui, id);
+                });
+              });
+          }
+        });
+    });
   }
 
   #[cfg(feature = "egui")]
-  fn inputs_ui(&mut self, _ui: &mut egui::Ui) {
-    panic!("Node doesn't support egui");
+  fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
+    let def = self.def();
+    for (idx, name) in def.inputs.keys().enumerate() {
+      ui.horizontal(|ui| {
+        let connected = false;
+        let input_id = NodeSocketId::input(0, id, idx as _);
+        ui.add(NodeSocket::new(input_id, connected));
+        ui.label(format!("{}:", name));
+      });
+    }
   }
 
   #[cfg(feature = "egui")]
-  fn outputs_ui(&mut self, _ui: &mut egui::Ui) {
-    panic!("Node doesn't support egui");
+  fn outputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
+    let def = self.def();
+    for (idx, name) in def.outputs.keys().enumerate() {
+      ui.horizontal(|ui| {
+        ui.label(format!("{}:", name));
+      });
+      ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+          let connected = false;
+          let output_id = NodeSocketId::output(0, id, idx as _);
+          ui.add(NodeSocket::new(output_id, connected));
+          ui.label(format!("{}:", name));
+        });
+      });
+    }
   }
 }
 
@@ -231,9 +324,9 @@ pub struct NodeState {
   uuid: Uuid,
   name: String,
   node: Box<dyn NodeImpl>,
-  position: mint::Vector2<f32>,
+  pub position: mint::Vector2<f32>,
   size: mint::Vector2<f32>,
-  //#[serde(skip)]
+  #[serde(skip)]
   updated: bool,
   selected: bool,
 }
@@ -265,6 +358,13 @@ impl NodeState {
     }
   }
 
+  /// Clone node with a new uuid.
+  pub fn duplicate(&self) -> Self {
+    let mut node = self.clone();
+    node.uuid = Uuid::new_v4();
+    node
+  }
+
   pub fn eval(
     &self,
     graph: &NodeGraph,
@@ -289,6 +389,95 @@ impl NodeState {
 
   pub fn set_input<I: Into<InputKey>>(&mut self, idx: I, value: Input) -> Result<Option<OutputId>> {
     self.node.set_node_input(&idx.into(), value)
+  }
+}
+
+#[cfg(feature = "egui")]
+impl NodeState {
+  fn get_zoomed(&self, zoom: f32) -> (egui::Vec2, egui::Vec2) {
+    let mut position = self.position;
+    let mut size = self.size;
+    position.zoom(zoom);
+    size.zoom(zoom);
+    (position.into(), size.into())
+  }
+
+  pub fn ui_at(&mut self, ui: &mut egui::Ui, offset: egui::Vec2, id: NodeId) {
+    let node_style = ui.node_style();
+    let zoom = node_style.zoom;
+    // Apply zoom to node position and size.
+    let (position, size) = self.get_zoomed(zoom);
+    // Need to translate node to Screen space.
+    let pos = position + offset;
+    let rect = egui::Rect::from_min_size(pos.to_pos2(), size);
+
+    // Dragged or clicked.
+    let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+    if resp.dragged() {
+      self.position = ((position + resp.drag_delta()) / zoom).into();
+      resp.scroll_to_me(None);
+    }
+    if resp.clicked() {
+      self.selected = !self.selected;
+    }
+
+    // Only render this node if it is visible or the node was updated.
+    if !self.updated && !ui.is_rect_visible(rect) {
+      // This is needed to stabilize Ui ids when nodes become visible.
+      ui.skip_ahead_auto_ids(1);
+      return;
+    }
+    self.updated = false;
+
+    let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.uuid);
+    self.frame_ui(&mut child_ui, node_style, id);
+
+    // Update node size.
+    let rect = child_ui.min_rect();
+    self.size = (rect.size() / zoom).into();
+  }
+
+  fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle, id: NodeId) {
+    let zoom = node_style.zoom;
+    // Window-style frame.
+    let style = ui.style();
+    let mut frame = egui::Frame::window(style);
+    frame.shadow = Default::default();
+    if self.selected {
+      frame.stroke.color = egui::Color32::WHITE;
+    }
+
+    frame
+      .fill(egui::Color32::from_gray(50))
+      .show(ui, |ui| {
+        ui.set_min_width(node_style.node_min_size.x);
+        let button_size = 20.0 * zoom;
+        StripBuilder::new(ui)
+          .size(Size::exact(button_size)) // Title bar
+          .size(Size::remainder()) // contents
+          .vertical(|mut strip| {
+            // Title bar.
+            strip.strip(|builder| {
+              builder
+                .size(Size::remainder()) // Title
+                .size(Size::exact(button_size)) // Close button
+                .horizontal(|mut strip| {
+                strip.cell(|ui| {
+                  ui.label(&self.name);
+                });
+                strip.cell(|ui| {
+                  if ui.button("🗙").clicked() {
+                    eprintln!("Close: {:?}", self.uuid);
+                  }
+                });
+               });
+            });
+            // Contents
+            strip.cell(|ui| {
+              self.node.ui(ui, id);
+            });
+          });
+      });
   }
 }
 

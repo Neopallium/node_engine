@@ -347,7 +347,7 @@ pub enum InputKey {
 
 impl From<InputId> for InputKey {
   fn from(id: InputId) -> Self {
-    Self::Idx(id.1)
+    Self::Idx(id.idx)
   }
 }
 
@@ -391,7 +391,7 @@ impl<T: Into<Value>> From<T> for Input {
 
 impl From<NodeId> for Input {
   fn from(n: NodeId) -> Self {
-    Self::Connect(OutputId(n, 0))
+    Self::Connect(OutputId::new(n, 0))
   }
 }
 
@@ -431,14 +431,14 @@ impl<T: ValueType> InputTyped<T> {
 
   pub fn eval(&self, graph: &NodeGraph, execution: &mut NodeGraphExecution) -> Result<T> {
     match &self.connected {
-      Some(OutputId(id, _)) => T::from_value(execution.eval_node(graph, *id)?),
+      Some(OutputId { node: id, .. }) => T::from_value(execution.eval_node(graph, *id)?),
       None => Ok(self.value.clone()),
     }
   }
 
   pub fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile) -> Result<String> {
     match &self.connected {
-      Some(OutputId(id, _)) => compile.resolve_node(graph, *id),
+      Some(OutputId { node: id, .. }) => compile.resolve_node(graph, *id),
       None => compile.compile_value(&self.value.to_value()),
     }
   }

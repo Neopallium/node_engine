@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 use slotmap::SlotMap;
 
@@ -8,6 +9,13 @@ use uuid::Uuid;
 use anyhow::{anyhow, Result};
 
 use crate::*;
+#[cfg(feature = "egui")]
+use crate::ui::{
+  NodeGraphAccess,
+  NodeGraphMeta,
+  NodeSocketMeta,
+  Zoom,
+};
 
 #[derive(Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -71,9 +79,68 @@ impl NodeRegistry {
   }
 }
 
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EditorState {
+  size: mint::Vector2<f32>,
+  origin: mint::Vector2<f32>,
+  zoom: f32,
+  scroll_offset: mint::Vector2<f32>,
+  // stats
+  #[serde(skip)]
+  render_nodes: Duration,
+  #[serde(skip)]
+  render_connections: Duration,
+  #[serde(skip)]
+  last_update: Option<Instant>,
+}
+
+impl Default for EditorState {
+  fn default() -> Self {
+    let size = glam::Vec2::new(1000.0, 1000.0);
+    let origin = size / 2.0;
+    Self {
+      size: size.into(),
+      origin: origin.into(),
+      zoom: 0.5,
+      //scroll_offset: (origin - glam::Vec2::new(450., 250.)).into(),
+      scroll_offset: glam::Vec2::new(50., 50.).into(),
+      render_nodes: Default::default(),
+      render_connections: Default::default(),
+      last_update: None,
+    }
+  }
+}
+
+#[cfg(feature = "egui")]
+impl EditorState {
+  fn update_stats(&mut self, render_nodes: Duration, render_connections: Duration) {
+    if let Some(last_update) = self.last_update {
+      if last_update.elapsed() < Duration::from_secs(1) {
+        return;
+      }
+    }
+    self.last_update = Some(Instant::now());
+    self.render_nodes = (self.render_nodes + render_nodes) / 2;
+    self.render_connections = (self.render_connections + render_connections) / 2;
+  }
+
+  fn get_zoomed(&self) -> (egui::Vec2, egui::Vec2, egui::Vec2, f32) {
+    let mut size = self.size;
+    let mut origin = self.origin;
+    let mut scroll_offset = self.scroll_offset;
+    size.zoom(self.zoom);
+    origin.zoom(self.zoom);
+    scroll_offset.zoom(self.zoom);
+    (size.into(), origin.into(), scroll_offset.into(), self.zoom)
+  }
+}
+
+
 #[derive(Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeGraph {
+  editor: EditorState,
   nodes: SlotMap<NodeId, NodeState>,
   connections: HashMap<InputId, OutputId>,
   output: Option<NodeId>,
@@ -99,7 +166,7 @@ impl NodeGraph {
   pub fn get_input_id<I: Into<InputKey>>(&self, id: NodeId, idx: I) -> Result<InputId> {
     let node = self.get(id)?;
     let idx = node.get_input_idx(&idx.into())?;
-    Ok(InputId(id, idx))
+    Ok(InputId::new(id, idx))
   }
 
   pub fn get_node_input<I: Into<InputKey>>(&self, id: NodeId, idx: I) -> Result<Input> {
@@ -119,7 +186,7 @@ impl NodeGraph {
       .get_mut(id)
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))?;
     // Convert Input key to id.
-    let input_id = node.get_input_idx(&key).map(|idx| InputId(id, idx))?;
+    let input_id = node.get_input_idx(&key).map(|idx| InputId::new(id, idx))?;
     match &value {
       Input::Disconnect => {
         self.connections.remove(&input_id);
@@ -167,5 +234,152 @@ impl NodeGraph {
 
   pub fn output(&self) -> Option<NodeId> {
     self.output
+  }
+}
+
+#[cfg(feature = "egui")]
+impl NodeGraph {
+  pub fn show(&mut self, ctx: &egui::Context) {
+    egui::Window::new("Graph editor")
+      .default_size((900., 500.))
+      .show(ctx, |ui| {
+        egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
+          ui.label("zoom:");
+          ui.add(egui::Slider::new(&mut self.editor.zoom, 0.1..=1.0).text("Zoom"));
+          ui.label(format!("Render nodes: {:?}", self.editor.render_nodes));
+          ui.label(format!("Render connections: {:?}", self.editor.render_connections));
+          ui.label("TODO: Node finder here");
+        });
+        egui::CentralPanel::default().show_inside(ui, |ui| {
+          self.node_graph_ui(ui);
+        });
+      });
+  }
+
+  fn node_graph_ui(&mut self, ui: &mut egui::Ui) {
+    // Use mouse wheel for zoom instead of scrolling.
+    // Mouse wheel + ctrl scrolling left/right.
+    // Multitouch (pinch gesture) zoom.
+    let mut scrolling = true;
+    if ui.ui_contains_pointer() {
+      let z_delta = ui.input(|i| {
+        // Use up/down mouse wheel for zoom.
+        let scroll_delta = i.scroll_delta.y;
+        if scroll_delta > 0.1 {
+          0.05
+        } else if scroll_delta < -0.1 {
+          -0.05
+        } else {
+          // For Multitouch devices (pinch gesture).
+          i.zoom_delta() - 1.0
+        }
+      });
+      if z_delta != 0.0 {
+        let zoom = (self.editor.zoom + z_delta).clamp(0.1, 1.0);
+        self.editor.zoom = zoom;
+        scrolling = false;
+      }
+    }
+    let (size, origin, scroll_offset, zoom) = self.editor.get_zoomed();
+    // Create scroll area and restore zoomed scroll offset.
+    let scroll_area = egui::ScrollArea::both()
+      .enable_scrolling(scrolling)
+      .scroll_offset(scroll_offset);
+
+    // Show scroll area.
+    let resp = scroll_area.show(ui, |ui| {
+      // Save old node style.
+      let old_node_style = ui.node_style();
+
+      // Apply zoom to Ui style.
+      let node_style = ui.zoom_style(zoom);
+
+      // Set node graph area.
+      ui.set_width(size.x);
+      ui.set_height(size.y);
+      let ui_min = ui.min_rect().min.to_vec2();
+      ui.set_node_graph_meta(NodeGraphMeta {
+        ui_min,
+        zoom,
+      });
+
+      let now = Instant::now();
+      // Render nodes.
+      for (id, node) in &mut self.nodes {
+        node.ui_at(ui, origin.into(), id);
+      }
+      let render_nodes = now.elapsed();
+
+      if ui.input(|i| i.pointer.any_released()) {
+        if let Some((src, dst)) = ui.get_dropped_node_sockets() {
+          // Make sure the input is first and that the sockets are compatible.
+          if let Some((src, dst)) = src.input_id_first(dst) {
+            if let Some(dst) = dst {
+              // Connect.
+              if let Err(err) = self.connect(src, dst) {
+                log::warn!("Failed to connect input[{src:?}] to output[{dst:?}]: {err:?}");
+              }
+            } else {
+              // Disconnect
+              if let Err(err) = self.disconnect(src) {
+                log::warn!("Failed to disconnect input[{src:?}]: {err:?}");
+              }
+            }
+          }
+        }
+      } else if let Some(src) = ui.get_src_node_socket() {
+        if ui.get_dst_node_socket().is_some() {
+          ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+        } else {
+          ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+        }
+        // If the dragged socket is an input, then remove it's current connection.
+        if let Some(src) = src.as_input_id() {
+          if let Err(err) = self.disconnect(src) {
+            log::warn!("Failed to disconnect input[{src:?}]: {err:?}");
+          }
+        }
+        if let Some(end) = ui.ctx().pointer_latest_pos() {
+          let src_meta = ui.data(|d| d.get_temp::<NodeSocketMeta>(src.ui_id())).unwrap();
+          let center = (src_meta.center * zoom).to_pos2() + ui_min;
+          let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id());
+          ui.with_layer_id(layer_id, |ui| {
+            ui.painter().line_segment([center, end], node_style.line_stroke);
+          });
+        }
+      }
+
+      // Draw connections.
+      let now = std::time::Instant::now();
+      let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id());
+      ui.with_layer_id(layer_id, |ui| {
+        let painter = ui.painter();
+        for (input, output) in &self.connections {
+          let in_id = input.socket_id();
+          let out_id = output.socket_id();
+          let meta = ui.data(|d| {
+            d.get_temp::<NodeSocketMeta>(in_id).and_then(|in_meta| {
+              d.get_temp::<NodeSocketMeta>(out_id).map(|out_meta| (in_meta, out_meta))
+            })
+          });
+          if let Some((in_meta, out_meta)) = meta {
+            let rect = egui::Rect::from_min_max(
+              (in_meta.center * zoom).to_pos2(),
+              (out_meta.center * zoom).to_pos2(),
+            ).translate(ui_min);
+            if ui.is_rect_visible(rect) {
+              painter.line_segment([rect.min, rect.max], node_style.line_stroke);
+            }
+          }
+        }
+      });
+      let render_connections = now.elapsed();
+      self.editor.update_stats(render_nodes, render_connections);
+
+      // Restore old NodeStyle.
+      ui.set_node_style(old_node_style);
+    });
+    // Save scroll offset and de-zoom it.
+    self.editor.scroll_offset = (resp.state.offset / zoom).into();
   }
 }
