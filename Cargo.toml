@@ -1,0 +1,61 @@
+[package]
+name = "node_engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["Robert G. Jakabosky <rjakabosky+neopallium@neoawareness.com>"]
+license = "MIT/Apache-2.0"
+description = "Node graph engine for Shader graph or Geometry graph."
+keywords = ["node", "graph", "shader", "geometry"]
+repository = "https://github.com/Neopallium/node_engine"
+homepage = "https://github.com/Neopallium/node_engine"
+
+[features]
+default = ["serde", "egui"]
+
+serde = ["dep:serde", "serde_json", "typetag", "indexmap/serde", "slotmap/serde", "glam/serde"]
+egui = ["dep:egui", "egui_extras"]
+
+[dependencies]
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.10"
+lazy_static = "1.4.0"
+thiserror = "1.0"
+
+egui = { version = "0.23.0", optional = true }
+egui_extras = { version = "0.23.0", optional = true }
+
+serde = { version = "1", optional = true, features = ["derive", "rc"] }
+serde_json = { version = "1", optional = true }
+typetag = { version = "0.2", optional = true }
+heck = "0.4"
+
+glam = "0.24"
+slotmap = "1.0"
+indexmap = "2.0"
+uuid = { version = "1.4", features = ["v5", "serde"] }
+
+[dev-dependencies]
+criterion = "0.5"
+eframe = "0.23"
+
+[[bench]]
+name = "node_graph"
+harness = false
+
+[profile.release]
+opt-level = 2 # fast and small wasm
+
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
+
+[patch.crates-io]
+
+# If you want to use the bleeding edge version of egui and eframe:
+# egui = { git = "https://github.com/emilk/egui", branch = "master" }
+# eframe = { git = "https://github.com/emilk/egui", branch = "master" }
+
+# If you fork https://github.com/emilk/egui you can test with:
+# egui = { path = "../egui/crates/egui" }
+# eframe = { path = "../egui/crates/eframe" }
