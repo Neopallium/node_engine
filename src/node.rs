@@ -8,15 +8,9 @@ use uuid::Uuid;
 
 use anyhow::{anyhow, Result};
 
-use crate::*;
 #[cfg(feature = "egui")]
-use crate::ui::{
-  NodeGraphAccess,
-  NodeStyle,
-  NodeSocket,
-  NodeSocketId,
-  Zoom,
-};
+use crate::ui::*;
+use crate::*;
 
 slotmap::new_key_type! {
   /// Node Id
@@ -29,8 +23,7 @@ pub fn node_idx(id: NodeId) -> u64 {
   id.0.as_ffi()
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InputId {
   pub node: NodeId,
   pub idx: u32,
@@ -38,10 +31,7 @@ pub struct InputId {
 
 impl InputId {
   pub fn new(node: NodeId, idx: u32) -> Self {
-    Self {
-      node,
-      idx,
-    }
+    Self { node, idx }
   }
 
   pub fn node(&self) -> NodeId {
@@ -53,8 +43,7 @@ impl InputId {
   }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct OutputId {
   pub node: NodeId,
   pub idx: u32,
@@ -62,10 +51,7 @@ pub struct OutputId {
 
 impl OutputId {
   pub fn new(node: NodeId, idx: u32) -> Self {
-    Self {
-      node,
-      idx,
-    }
+    Self { node, idx }
   }
 
   pub fn node(&self) -> NodeId {
@@ -229,8 +215,7 @@ impl Clone for Box<dyn NodeImpl> {
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct EditOnlyNode {
   pub def: NodeDefinition,
   pub inputs: HashMap<String, Input>,
@@ -308,8 +293,7 @@ impl NodeImpl for EditOnlyNode {
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NodeState {
   uuid: Uuid,
   name: String,
@@ -341,8 +325,8 @@ impl NodeState {
       uuid: Uuid::new_v4(),
       name: def.name.clone(),
       node: def.new_node(),
-      position: [0.,0.].into(),
-      size: [10.,10.].into(),
+      position: [0., 0.].into(),
+      size: [10., 10.].into(),
       updated: true,
       selected: false,
     }
@@ -378,6 +362,7 @@ impl NodeState {
   }
 
   pub fn set_input<I: Into<InputKey>>(&mut self, idx: I, value: Input) -> Result<Option<OutputId>> {
+    self.updated = true;
     self.node.set_node_input(&idx.into(), value)
   }
 }
@@ -436,23 +421,21 @@ impl NodeState {
       frame.stroke.color = egui::Color32::WHITE;
     }
 
-    frame
-      .fill(egui::Color32::from_gray(50))
-      .show(ui, |ui| {
-        ui.vertical(|ui| {
-          // Title bar.
-          ui.horizontal(|ui| {
-            ui.label(&self.name);
-          });
-          // Contents
-          egui::Frame::none()
-            .fill(egui::Color32::from_gray(63))
-            .show(ui, |ui| {
-              ui.set_min_width(node_style.node_min_size.x);
-              self.node.ui(ui, id);
-            });
+    frame.fill(egui::Color32::from_gray(50)).show(ui, |ui| {
+      ui.vertical(|ui| {
+        // Title bar.
+        ui.horizontal(|ui| {
+          ui.label(&self.name);
         });
+        // Contents
+        egui::Frame::none()
+          .fill(egui::Color32::from_gray(63))
+          .show(ui, |ui| {
+            ui.set_min_width(node_style.node_min_size.x);
+            self.node.ui(ui, id);
+          });
       });
+    });
   }
 }
 
@@ -465,8 +448,7 @@ pub trait NodeBuilder: fmt::Debug + Send + Sync + 'static {
   fn new_node(&self, def: &NodeDefinition) -> Box<dyn NodeImpl>;
 }
 
-#[derive(Clone, Debug, Default)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct DefaultNodeBuilder;
 
 #[typetag::serde]
@@ -482,8 +464,7 @@ impl Default for Box<dyn NodeBuilder> {
   }
 }
 
-#[derive(Clone, Debug, Default)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct NodeDefinition {
   pub name: String,
   pub description: String,

@@ -1,10 +1,6 @@
 use egui::{self, NumExt};
 
-use crate::node::{
-  NodeId,
-  InputId,
-  OutputId,
-};
+use crate::node::{InputId, NodeId, OutputId};
 
 mod zoom;
 pub use zoom::*;
@@ -34,12 +30,12 @@ impl Default for NodeStyle {
 }
 
 impl Zoom for NodeStyle {
-    #[inline(always)]
-    fn zoom(&mut self, zoom: f32) {
-        self.zoom *= zoom;
-        self.node_min_size.zoom(zoom);
-        self.line_stroke.zoom(zoom);
-    }
+  #[inline(always)]
+  fn zoom(&mut self, zoom: f32) {
+    self.zoom *= zoom;
+    self.node_min_size.zoom(zoom);
+    self.line_stroke.zoom(zoom);
+  }
 }
 
 pub trait NodeGraphAccess {
@@ -103,7 +99,8 @@ impl NodeGraphAccess for egui::Ui {
 
   fn update_node_socket(&mut self, id: NodeSocketId, pos: egui::Pos2) {
     self.data_mut(|d| {
-      let graph = d.get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META))
+      let graph = d
+        .get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META))
         .unwrap_or_default();
       let meta = d.get_temp_mut_or_default::<NodeSocketMeta>(id.ui_id());
       meta.center = graph.ui_to_graph(pos);
@@ -116,7 +113,8 @@ impl NodeGraphAccess for egui::Ui {
   }
 
   fn node_graph_meta(&self) -> NodeGraphMeta {
-    self.data(|d| d.get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META)))
+    self
+      .data(|d| d.get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META)))
       .unwrap_or_default()
   }
 
@@ -125,7 +123,8 @@ impl NodeGraphAccess for egui::Ui {
   }
 
   fn node_style(&self) -> NodeStyle {
-    self.data(|d| d.get_temp::<NodeStyle>(egui::Id::new(NODE_STYLE)))
+    self
+      .data(|d| d.get_temp::<NodeStyle>(egui::Id::new(NODE_STYLE)))
       .unwrap_or_default()
   }
 
@@ -168,29 +167,26 @@ pub struct NodeSocket {
 
 impl NodeSocket {
   pub fn new(id: NodeSocketId, connected: bool) -> Self {
-    Self {
-      id,
-      connected,
-    }
+    Self { id, connected }
   }
 }
 
 impl egui::Widget for NodeSocket {
   fn ui(self, ui: &mut egui::Ui) -> egui::Response {
     let Self { id, connected } = self;
- 
+
     // 1. Deciding widget size:
     let spacing = &ui.spacing();
     let icon_width = spacing.icon_width;
-    let desired_size = egui::vec2(icon_width, icon_width)
-      .at_least(egui::Vec2::splat(spacing.interact_size.y));
-  
+    let desired_size =
+      egui::vec2(icon_width, icon_width).at_least(egui::Vec2::splat(spacing.interact_size.y));
+
     // 2. Allocating space:
     let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::drag());
     // All coordinates are in absolute screen coordinates so we use `rect` to place the elements.
     let (small_icon_rect, big_icon_rect) = ui.spacing().icon_rectangles(rect);
     let center = small_icon_rect.center();
-  
+
     // Update socket metadata.
     ui.update_node_socket(id, center);
 
@@ -199,8 +195,7 @@ impl egui::Widget for NodeSocket {
       ui.set_src_node_socket(id);
     }
     // HACK: Fix hover during drag.
-    let mut hovered = ui.rect_contains_pointer(rect) ||
-      response.hovered();
+    let mut hovered = ui.rect_contains_pointer(rect) || response.hovered();
     if hovered {
       if let Some(src) = ui.get_src_node_socket() {
         // Check if src socket is compatible.
@@ -216,7 +211,7 @@ impl egui::Widget for NodeSocket {
       ui.clear_dst_node_socket();
     }
     let selected = hovered || connected;
-  
+
     // We will follow the current style by asking
     // "how should something that is being interacted with be painted?".
     // This will, for instance, give us different colors when the widget is hovered or clicked.
@@ -229,7 +224,7 @@ impl egui::Widget for NodeSocket {
 
     // Attach some meta-data to the response which can be used by screen readers:
     response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, selected, ""));
-  
+
     // 4. Paint!
     // Make sure we need to paint:
     if ui.is_rect_visible(rect) {
@@ -239,12 +234,7 @@ impl egui::Widget for NodeSocket {
 
       let painter = ui.painter();
 
-      painter.circle(
-        center,
-        big_radius,
-        visuals.bg_fill,
-        visuals.bg_stroke,
-      );
+      painter.circle(center, big_radius, visuals.bg_fill, visuals.bg_stroke);
 
       if selected {
         painter.circle_filled(
@@ -275,8 +265,10 @@ impl NodeSocketId {
 
   pub fn is_compatible(&self, dst: NodeSocketId) -> bool {
     match (self, &dst) {
-      (Self::Input(g_in, input), Self::Output(g_out, output)) |
-        (Self::Output(g_out, output), Self::Input(g_in, input)) if g_in == g_out => {
+      (Self::Input(g_in, input), Self::Output(g_out, output))
+      | (Self::Output(g_out, output), Self::Input(g_in, input))
+        if g_in == g_out =>
+      {
         input.node != output.node
       }
       _ => false,
@@ -286,15 +278,17 @@ impl NodeSocketId {
   pub fn input_first(&self, dst: Option<NodeSocketId>) -> Option<(Self, Option<Self>)> {
     match (*self, dst) {
       // Disconect input.
-      (Self::Input(_, _), None) => {
-        Some((*self, None))
-      }
+      (Self::Input(_, _), None) => Some((*self, None)),
       // Connect input to output.
-      (Self::Input(g_in, input), Some(Self::Output(g_out, output))) if g_in == g_out && input.node != output.node => {
+      (Self::Input(g_in, input), Some(Self::Output(g_out, output)))
+        if g_in == g_out && input.node != output.node =>
+      {
         Some((*self, dst))
       }
       // Connect output to input.
-      (Self::Output(g_out, output), Some(Self::Input(g_in, input))) if g_in == g_out && input.node != output.node => {
+      (Self::Output(g_out, output), Some(Self::Input(g_in, input)))
+        if g_in == g_out && input.node != output.node =>
+      {
         Some((dst.unwrap(), Some(*self)))
       }
       // Other non-compatible connections.
@@ -305,15 +299,17 @@ impl NodeSocketId {
   pub fn input_id_first(&self, dst: Option<NodeSocketId>) -> Option<(InputId, Option<OutputId>)> {
     match (*self, dst) {
       // Disconect input.
-      (Self::Input(_, id), None) => {
-        Some((id, None))
-      }
+      (Self::Input(_, id), None) => Some((id, None)),
       // Connect input to output.
-      (Self::Input(g_in, input), Some(Self::Output(g_out, output))) if g_in == g_out && input.node != output.node => {
+      (Self::Input(g_in, input), Some(Self::Output(g_out, output)))
+        if g_in == g_out && input.node != output.node =>
+      {
         Some((input, Some(output)))
       }
       // Connect output to input.
-      (Self::Output(g_out, output), Some(Self::Input(g_in, input))) if g_in == g_out && input.node != output.node => {
+      (Self::Output(g_out, output), Some(Self::Input(g_in, input)))
+        if g_in == g_out && input.node != output.node =>
+      {
         Some((input, Some(output)))
       }
       // Other non-compatible connections.

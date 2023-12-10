@@ -7,8 +7,12 @@ fn main() {
     initial_window_size: Some(egui::vec2(1000., 600.)),
     ..Default::default()
   };
-  eframe::run_native("My egui App", native_options, Box::new(|cc| Box::new(MyEguiApp::new(cc))))
-    .expect("ok");
+  eframe::run_native(
+    "My egui App",
+    native_options,
+    Box::new(|cc| Box::new(MyEguiApp::new(cc))),
+  )
+  .expect("ok");
 }
 
 const X_OFFSET: f32 = 400.0;
@@ -67,11 +71,8 @@ impl MyEguiApp {
   fn new(_cc: &eframe::CreationContext<'_>) -> Self {
     let reg = build_registry();
     eprintln!("Build shader graph");
-    let (_size, graph) = build_graph(&reg, 3)
-      .expect("built graph");
-    Self {
-      graph,
-    }
+    let (_size, graph) = build_graph(&reg, 3).expect("built graph");
+    Self { graph }
   }
 }
 

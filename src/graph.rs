@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
 
 use slotmap::SlotMap;
 
@@ -8,17 +7,11 @@ use uuid::Uuid;
 
 use anyhow::{anyhow, Result};
 
-use crate::*;
 #[cfg(feature = "egui")]
-use crate::ui::{
-  NodeGraphAccess,
-  NodeGraphMeta,
-  NodeSocketMeta,
-  Zoom,
-};
+use crate::ui::*;
+use crate::*;
 
-#[derive(Default, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
 struct NodeRegistryInner {
   nodes: HashMap<Uuid, NodeDefinition>,
   name_to_id: HashMap<String, Uuid>,
@@ -43,8 +36,7 @@ impl NodeRegistryInner {
   }
 }
 
-#[derive(Default, Clone)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NodeRegistry(Arc<RwLock<NodeRegistryInner>>);
 
 impl NodeRegistry {
@@ -79,20 +71,12 @@ impl NodeRegistry {
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct EditorState {
   size: emath::Vec2,
   origin: emath::Vec2,
   zoom: f32,
   scroll_offset: emath::Vec2,
-  // stats
-  #[serde(skip)]
-  render_nodes: Duration,
-  #[serde(skip)]
-  render_connections: Duration,
-  #[serde(skip)]
-  last_update: Option<Instant>,
 }
 
 impl Default for EditorState {
@@ -104,26 +88,12 @@ impl Default for EditorState {
       origin,
       zoom: 0.5,
       scroll_offset: origin - emath::vec2(450., 250.),
-      render_nodes: Default::default(),
-      render_connections: Default::default(),
-      last_update: None,
     }
   }
 }
 
 #[cfg(feature = "egui")]
 impl EditorState {
-  fn update_stats(&mut self, render_nodes: Duration, render_connections: Duration) {
-    if let Some(last_update) = self.last_update {
-      if last_update.elapsed() < Duration::from_secs(1) {
-        return;
-      }
-    }
-    self.last_update = Some(Instant::now());
-    self.render_nodes = (self.render_nodes + render_nodes) / 2;
-    self.render_connections = (self.render_connections + render_connections) / 2;
-  }
-
   fn get_zoomed(&self) -> (emath::Vec2, emath::Vec2, emath::Vec2, f32) {
     let mut size = self.size;
     let mut origin = self.origin;
@@ -135,9 +105,7 @@ impl EditorState {
   }
 }
 
-
-#[derive(Clone, Default, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NodeGraph {
   editor: EditorState,
   nodes: SlotMap<NodeId, NodeState>,
@@ -245,8 +213,6 @@ impl NodeGraph {
         egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
           ui.label("zoom:");
           ui.add(egui::Slider::new(&mut self.editor.zoom, 0.1..=1.0).text("Zoom"));
-          ui.label(format!("Render nodes: {:?}", self.editor.render_nodes));
-          ui.label(format!("Render connections: {:?}", self.editor.render_connections));
           ui.label("TODO: Node finder here");
         });
         egui::CentralPanel::default().show_inside(ui, |ui| {
@@ -299,17 +265,12 @@ impl NodeGraph {
       // Need UI screen-space `min` to covert Node Graph positions to screen-space.
       let ui_min = ui.min_rect().min.to_vec2();
       let origin = origin + ui_min;
-      ui.set_node_graph_meta(NodeGraphMeta {
-        ui_min,
-        zoom,
-      });
+      ui.set_node_graph_meta(NodeGraphMeta { ui_min, zoom });
 
-      let now = Instant::now();
       // Render nodes.
       for (id, node) in &mut self.nodes {
         node.ui_at(ui, origin, id);
       }
-      let render_nodes = now.elapsed();
 
       if ui.input(|i| i.pointer.any_released()) {
         if let Some((src, dst)) = ui.get_dropped_node_sockets() {
@@ -341,17 +302,19 @@ impl NodeGraph {
           }
         }
         if let Some(end) = ui.ctx().pointer_latest_pos() {
-          let src_meta = ui.data(|d| d.get_temp::<NodeSocketMeta>(src.ui_id())).unwrap();
+          let src_meta = ui
+            .data(|d| d.get_temp::<NodeSocketMeta>(src.ui_id()))
+            .unwrap();
           let center = (src_meta.center * zoom).to_pos2() + ui_min;
           let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id());
           ui.with_layer_id(layer_id, |ui| {
-            ui.painter().line_segment([center, end], node_style.line_stroke);
+            ui.painter()
+              .line_segment([center, end], node_style.line_stroke);
           });
         }
       }
 
       // Draw connections.
-      let now = std::time::Instant::now();
       let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id());
       ui.with_layer_id(layer_id, |ui| {
         let painter = ui.painter();
@@ -360,22 +323,22 @@ impl NodeGraph {
           let out_id = output.ui_id();
           let meta = ui.data(|d| {
             d.get_temp::<NodeSocketMeta>(in_id).and_then(|in_meta| {
-              d.get_temp::<NodeSocketMeta>(out_id).map(|out_meta| (in_meta, out_meta))
+              d.get_temp::<NodeSocketMeta>(out_id)
+                .map(|out_meta| (in_meta, out_meta))
             })
           });
           if let Some((in_meta, out_meta)) = meta {
             let rect = egui::Rect::from_min_max(
               (in_meta.center * zoom).to_pos2(),
               (out_meta.center * zoom).to_pos2(),
-            ).translate(ui_min);
+            )
+            .translate(ui_min);
             if ui.is_rect_visible(rect) {
               painter.line_segment([rect.min, rect.max], node_style.line_stroke);
             }
           }
         }
       });
-      let render_connections = now.elapsed();
-      self.editor.update_stats(render_nodes, render_connections);
 
       // Restore old NodeStyle.
       ui.set_node_style(old_node_style);

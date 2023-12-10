@@ -2,8 +2,8 @@ use slotmap::SecondaryMap;
 
 use anyhow::{anyhow, Result};
 
-use crate::node::*;
 use crate::graph::*;
+use crate::node::*;
 use crate::values::*;
 
 #[derive(Clone, Default, Debug)]

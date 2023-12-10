@@ -4,8 +4,8 @@ use slotmap::{SecondaryMap, SlotMap};
 
 use anyhow::{anyhow, Result};
 
-use crate::node::*;
 use crate::graph::*;
+use crate::node::*;
 use crate::values::*;
 
 slotmap::new_key_type! {

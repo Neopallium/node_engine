@@ -51,8 +51,12 @@ fn build_graph(
 
   let input = if common_input {
     let id = graph.add(scalar.clone());
-    graph.set_node_input(id, "A", Input::from(1.0)).expect("set input");
-    graph.set_node_input(id, "B", Input::from(0.0)).expect("set input");
+    graph
+      .set_node_input(id, "A", Input::from(1.0))
+      .expect("set input");
+    graph
+      .set_node_input(id, "B", Input::from(0.0))
+      .expect("set input");
     Input::from(id)
   } else {
     Input::from(1.0)

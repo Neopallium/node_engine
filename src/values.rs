@@ -10,8 +10,7 @@ use anyhow::{anyhow, Result};
 
 use crate::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DataType {
   Scalar,
   Vec2,
@@ -30,8 +29,7 @@ impl DataType {
   }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Value {
   Scalar(f32),
   Vec2(Vec2),
@@ -127,8 +125,7 @@ impl From<Vec4> for Value {
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InputDefinition {
   pub field_name: String,
   pub value_type: DataType,
@@ -172,8 +169,7 @@ impl InputDefinition {
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct OutputDefinition {
   pub field_name: String,
   pub value_type: DataType,
@@ -199,8 +195,7 @@ impl OutputDefinition {
   }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ParameterDataType {
   Value(DataType),
   Select(IndexSet<String>),
@@ -222,8 +217,7 @@ impl ParameterDataType {
   }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ParameterValue {
   Value(Value),
   Selected(String),
@@ -281,8 +275,7 @@ where
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ParameterDefinition {
   pub field_name: String,
   pub param_type: ParameterDataType,
@@ -348,8 +341,7 @@ impl ParameterDefinition {
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum InputKey {
   Idx(u32),
   Name(String),
@@ -385,8 +377,7 @@ impl From<&str> for InputKey {
   }
 }
 
-#[derive(Clone, Debug)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Input {
   Disconnect,
   Connect(OutputId),
@@ -418,8 +409,7 @@ pub trait ValueType: Sized + Default + Clone + fmt::Debug + 'static {
   }
 }
 
-#[derive(Clone, Debug, Default)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct InputTyped<T> {
   value: T,
   connected: Option<OutputId>,
@@ -564,8 +554,7 @@ impl ValueType for Vec4 {
   }
 }
 
-#[derive(Clone, Debug, Default)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct OutputTyped<T> {
   _phantom: core::marker::PhantomData<T>,
 }
