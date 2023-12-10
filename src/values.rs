@@ -91,6 +91,16 @@ impl Value {
       Self::Vec4(_) => DataType::Vec4,
     }
   }
+
+  #[cfg(feature = "egui")]
+  pub fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    match self {
+      Self::Scalar(v) => v.ui(ui),
+      Self::Vec2(v) => v.ui(ui),
+      Self::Vec3(v) => v.ui(ui),
+      Self::Vec4(v) => v.ui(ui),
+    }
+  }
 }
 
 impl From<f32> for Value {
@@ -401,6 +411,11 @@ pub trait ValueType: Sized + Default + Clone + fmt::Debug + 'static {
   fn from_value(value: Value) -> Result<Self>;
 
   fn data_type() -> DataType;
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    ui.label("No UI for type.")
+  }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -470,6 +485,11 @@ impl ValueType for f32 {
   fn data_type() -> DataType {
     DataType::Scalar
   }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    ui.add(egui::DragValue::new(self).speed(0.1))
+  }
 }
 
 impl ValueType for Vec2 {
@@ -483,6 +503,14 @@ impl ValueType for Vec2 {
 
   fn data_type() -> DataType {
     DataType::Vec2
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    ui.label("x");
+    let resp = ui.add(egui::DragValue::new(&mut self.x).speed(0.1));
+    ui.label("y");
+    resp | ui.add(egui::DragValue::new(&mut self.y).speed(0.1))
   }
 }
 
@@ -498,6 +526,16 @@ impl ValueType for Vec3 {
   fn data_type() -> DataType {
     DataType::Vec3
   }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    ui.label("x");
+    let mut resp = ui.add(egui::DragValue::new(&mut self.x).speed(0.1));
+    ui.label("y");
+    resp |= ui.add(egui::DragValue::new(&mut self.y).speed(0.1));
+    ui.label("z");
+    resp | ui.add(egui::DragValue::new(&mut self.z).speed(0.1))
+  }
 }
 
 impl ValueType for Vec4 {
@@ -511,6 +549,18 @@ impl ValueType for Vec4 {
 
   fn data_type() -> DataType {
     DataType::Vec4
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    ui.label("x");
+    let mut resp = ui.add(egui::DragValue::new(&mut self.x).speed(0.1));
+    ui.label("y");
+    resp |= ui.add(egui::DragValue::new(&mut self.y).speed(0.1));
+    ui.label("z");
+    resp |= ui.add(egui::DragValue::new(&mut self.z).speed(0.1));
+    ui.label("w");
+    resp | ui.add(egui::DragValue::new(&mut self.w).speed(0.1))
   }
 }
 

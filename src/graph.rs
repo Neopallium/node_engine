@@ -97,7 +97,7 @@ pub struct EditorState {
 
 impl Default for EditorState {
   fn default() -> Self {
-    let size = emath::vec2(1000.0, 1000.0);
+    let size = emath::vec2(10000.0, 10000.0);
     let origin = size / 2.0;
     Self {
       size,
@@ -265,9 +265,9 @@ impl NodeGraph {
         // Use up/down mouse wheel for zoom.
         let scroll_delta = i.scroll_delta.y;
         if scroll_delta > 0.1 {
-          0.05
+          0.01
         } else if scroll_delta < -0.1 {
-          -0.05
+          -0.01
         } else {
           // For Multitouch devices (pinch gesture).
           i.zoom_delta() - 1.0
@@ -296,7 +296,9 @@ impl NodeGraph {
       // Set node graph area.
       ui.set_width(size.x);
       ui.set_height(size.y);
+      // Need UI screen-space `min` to covert Node Graph positions to screen-space.
       let ui_min = ui.min_rect().min.to_vec2();
+      let origin = origin + ui_min;
       ui.set_node_graph_meta(NodeGraphMeta {
         ui_min,
         zoom,
@@ -354,8 +356,8 @@ impl NodeGraph {
       ui.with_layer_id(layer_id, |ui| {
         let painter = ui.painter();
         for (input, output) in &self.connections {
-          let in_id = input.socket_id();
-          let out_id = output.socket_id();
+          let in_id = input.ui_id();
+          let out_id = output.ui_id();
           let meta = ui.data(|d| {
             d.get_temp::<NodeSocketMeta>(in_id).and_then(|in_meta| {
               d.get_temp::<NodeSocketMeta>(out_id).map(|out_meta| (in_meta, out_meta))

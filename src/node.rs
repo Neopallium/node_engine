@@ -8,9 +8,6 @@ use uuid::Uuid;
 
 use anyhow::{anyhow, Result};
 
-#[cfg(feature = "egui")]
-use egui_extras::{StripBuilder, Size};
-
 use crate::*;
 #[cfg(feature = "egui")]
 use crate::ui::{
@@ -132,57 +129,53 @@ pub trait NodeImpl: fmt::Debug {
     let def = self.def();
     let input_count = def.inputs.len();
     let output_count = def.outputs.len();
-    let mut columns = 0;
-    if input_count > 0 {
-      columns += 1;
-    }
-    if output_count > 0 {
-      columns += 1;
-    }
-
-    // Frame for inputs/outputs
-    egui::Frame::none()
-      .fill(egui::Color32::from_gray(63))
-      .show(ui, |ui| {
-        ui.columns(columns, |columns| {
-          let mut col = 0;
-          if input_count > 0 {
-            // Inputs frame.
-            egui::Frame::none()
-              .fill(egui::Color32::from_gray(80))
-              .show(&mut columns[col], |ui| {
-                ui.set_min_size(ui.available_size());
-                ui.vertical(|ui| {
-                  self.inputs_ui(ui, id);
-                });
-              });
-            col += 1;
-          }
-          if output_count > 0 {
-            // Outputs frame.
-            egui::Frame::none()
-              .fill(egui::Color32::from_gray(63))
-              .show(&mut columns[col], |ui| {
-                ui.set_min_size(ui.available_size());
-                ui.vertical(|ui| {
-                  self.outputs_ui(ui, id);
-                });
-              });
-          }
+    let node_style = ui.node_style();
+    let zoom = node_style.zoom;
+    ui.horizontal(|ui| {
+      if input_count > 0 {
+        ui.vertical(|ui| {
+          self.inputs_ui(ui, id);
         });
+      }
+      if output_count > 0 {
+        ui.vertical(|ui| {
+          ui.set_min_width(50.0 * zoom);
+          self.outputs_ui(ui, id);
+        });
+      }
     });
   }
 
   #[cfg(feature = "egui")]
   fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
-    let def = self.def();
-    for (idx, name) in def.inputs.keys().enumerate() {
+    let mut input_changed = None;
+    for (idx, name) in self.def().inputs.keys().enumerate() {
+      let idx = idx as u32;
       ui.horizontal(|ui| {
-        let connected = false;
-        let input_id = NodeSocketId::input(0, id, idx as _);
+        let input_key = InputKey::from(idx);
+        let (connected, value) = match self.get_node_input(&input_key) {
+          Ok(Input::Value(val)) => (false, Some(val)),
+          Ok(Input::Connect(_)) => (true, None),
+          Ok(Input::Disconnect) => (false, None),
+          Err(err) => {
+            ui.label(format!("Invalid input: {err:?}"));
+            return;
+          }
+        };
+        let input_id = NodeSocketId::input(0, id, idx);
         ui.add(NodeSocket::new(input_id, connected));
-        ui.label(format!("{}:", name));
+        ui.label(format!("{}", name));
+        if let Some(mut value) = value {
+          if value.ui(ui).changed() {
+            input_changed = Some((input_key, value));
+          }
+        }
       });
+    }
+    if let Some((input_key, value)) = input_changed {
+      if let Err(err) = self.set_node_input(&input_key, value.into()) {
+        log::error!("Failed to update node input: {err:?}");
+      }
     }
   }
 
@@ -191,14 +184,11 @@ pub trait NodeImpl: fmt::Debug {
     let def = self.def();
     for (idx, name) in def.outputs.keys().enumerate() {
       ui.horizontal(|ui| {
-        ui.label(format!("{}:", name));
-      });
-      ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
           let connected = false;
           let output_id = NodeSocketId::output(0, id, idx as _);
           ui.add(NodeSocket::new(output_id, connected));
-          ui.label(format!("{}:", name));
+          ui.label(format!("{}", name));
         });
       });
     }
@@ -438,7 +428,6 @@ impl NodeState {
   }
 
   fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle, id: NodeId) {
-    let zoom = node_style.zoom;
     // Window-style frame.
     let style = ui.style();
     let mut frame = egui::Frame::window(style);
@@ -450,33 +439,19 @@ impl NodeState {
     frame
       .fill(egui::Color32::from_gray(50))
       .show(ui, |ui| {
-        ui.set_min_width(node_style.node_min_size.x);
-        let button_size = 20.0 * zoom;
-        StripBuilder::new(ui)
-          .size(Size::exact(button_size)) // Title bar
-          .size(Size::remainder()) // contents
-          .vertical(|mut strip| {
-            // Title bar.
-            strip.strip(|builder| {
-              builder
-                .size(Size::remainder()) // Title
-                .size(Size::exact(button_size)) // Close button
-                .horizontal(|mut strip| {
-                strip.cell(|ui| {
-                  ui.label(&self.name);
-                });
-                strip.cell(|ui| {
-                  if ui.button("🗙").clicked() {
-                    eprintln!("Close: {:?}", self.uuid);
-                  }
-                });
-               });
-            });
-            // Contents
-            strip.cell(|ui| {
+        ui.vertical(|ui| {
+          // Title bar.
+          ui.horizontal(|ui| {
+            ui.label(&self.name);
+          });
+          // Contents
+          egui::Frame::none()
+            .fill(egui::Color32::from_gray(63))
+            .show(ui, |ui| {
+              ui.set_min_width(node_style.node_min_size.x);
               self.node.ui(ui, id);
             });
-          });
+        });
       });
   }
 }

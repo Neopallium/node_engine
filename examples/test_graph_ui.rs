@@ -11,7 +11,7 @@ fn main() {
     .expect("ok");
 }
 
-const X_OFFSET: f32 = 250.0;
+const X_OFFSET: f32 = 400.0;
 const Y_OFFSET: f32 = 50.0;
 
 fn build_sub_graph(

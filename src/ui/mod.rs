@@ -345,20 +345,20 @@ impl NodeSocketId {
 
   pub fn ui_id(&self) -> egui::Id {
     match self {
-      Self::Input(_graph, id) => id.socket_id(),
-      Self::Output(_graph, id) => id.socket_id(),
+      Self::Input(_graph, id) => id.ui_id(),
+      Self::Output(_graph, id) => id.ui_id(),
     }
   }
 }
 
 impl InputId {
-  pub fn socket_id(&self) -> egui::Id {
+  pub fn ui_id(&self) -> egui::Id {
     egui::Id::new(NODE_INPUT_ID).with(self.node).with(self.idx)
   }
 }
 
 impl OutputId {
-  pub fn socket_id(&self) -> egui::Id {
+  pub fn ui_id(&self) -> egui::Id {
     egui::Id::new(NODE_OUTPUT_ID).with(self.node).with(self.idx)
   }
 }
