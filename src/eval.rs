@@ -7,7 +7,7 @@ use crate::node::*;
 use crate::values::*;
 
 #[derive(Clone, Default, Debug)]
-pub enum NodeState {
+pub enum NodeEvalState {
   #[default]
   Processing,
   Cached(Value),
@@ -15,7 +15,7 @@ pub enum NodeState {
 
 #[derive(Clone, Default, Debug)]
 pub struct NodeGraphExecution {
-  nodes: HashMap<NodeId, NodeState>,
+  nodes: HashMap<NodeId, NodeEvalState>,
 }
 
 impl NodeGraphExecution {
@@ -42,21 +42,21 @@ impl NodeGraphExecution {
       // Check for cached value or recursive connections.
       match self.nodes.entry(id) {
         Entry::Occupied(entry) => match entry.get() {
-          NodeState::Processing => {
+          NodeEvalState::Processing => {
             Err(anyhow!("Recursive node connection"))?;
           }
-          NodeState::Cached(value) => {
+          NodeEvalState::Cached(value) => {
             return Ok(value.clone());
           }
         },
         Entry::Vacant(entry) => {
-          entry.insert(NodeState::Processing);
+          entry.insert(NodeEvalState::Processing);
         }
       }
       // Evaluate node.
       let value = node.eval(graph, self, id)?;
       // Cache results.
-      self.nodes.insert(id, NodeState::Cached(value.clone()));
+      self.nodes.insert(id, NodeEvalState::Cached(value.clone()));
       Ok(value)
     } else {
       // Evaluate node.

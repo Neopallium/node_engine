@@ -302,20 +302,6 @@ pub struct NodeState {
   selected: bool,
 }
 
-impl core::ops::Deref for NodeState {
-  type Target = Box<dyn NodeImpl>;
-
-  fn deref(&self) -> &Self::Target {
-    &self.node
-  }
-}
-
-impl core::ops::DerefMut for NodeState {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    &mut self.node
-  }
-}
-
 impl NodeState {
   pub fn new(def: &NodeDefinition) -> Self {
     Self {
@@ -352,6 +338,14 @@ impl NodeState {
     id: NodeId,
   ) -> Result<()> {
     self.node.compile(graph, compile, id)
+  }
+
+  pub fn cache_output(&self) -> bool {
+    self.node.cache_output()
+  }
+
+  pub fn get_input_idx(&self, idx: &InputKey) -> Result<u32> {
+    self.node.get_input_idx(idx)
   }
 
   pub fn get_input<I: Into<InputKey>>(&self, idx: I) -> Result<Input> {

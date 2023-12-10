@@ -143,7 +143,7 @@ impl NodeGraph {
   }
 
   pub fn get_node_input<I: Into<InputKey>>(&self, id: NodeId, idx: I) -> Result<Input> {
-    self.get(id).and_then(|n| n.get_node_input(&idx.into()))
+    self.get(id).and_then(|n| n.get_input(idx.into()))
   }
 
   pub fn set_node_input<I: Into<InputKey>>(
@@ -170,7 +170,7 @@ impl NodeGraph {
       _ => {}
     }
     // Set the node input.
-    Ok(node.set_node_input(&key, value)?)
+    Ok(node.set_input(key, value)?)
   }
 
   pub fn set_input(&mut self, input_id: InputId, value: Input) -> Result<Option<OutputId>> {
