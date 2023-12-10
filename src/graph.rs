@@ -18,7 +18,7 @@ use crate::ui::{
 };
 
 #[derive(Default, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct NodeRegistryInner {
   nodes: HashMap<Uuid, NodeDefinition>,
   name_to_id: HashMap<String, Uuid>,
@@ -44,7 +44,7 @@ impl NodeRegistryInner {
 }
 
 #[derive(Default, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NodeRegistry(Arc<RwLock<NodeRegistryInner>>);
 
 impl NodeRegistry {
@@ -80,7 +80,7 @@ impl NodeRegistry {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct EditorState {
   size: emath::Vec2,
   origin: emath::Vec2,
@@ -137,7 +137,7 @@ impl EditorState {
 
 
 #[derive(Clone, Default, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NodeGraph {
   editor: EditorState,
   nodes: SlotMap<NodeId, NodeState>,

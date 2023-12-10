@@ -86,7 +86,7 @@ macro_rules! impl_node {
 
           $(#[$param_enum_meta])*
           #[derive(Copy, Clone, Debug, Default)]
-          #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+          #[derive(serde::Serialize, serde::Deserialize)]
           pub enum $param_enum_name {
             #[default]
             $(
@@ -304,7 +304,7 @@ macro_rules! impl_node {
         [
           $( $node_struct_fields )*
           $( #[$field_meta] )*
-          #[cfg_attr(feature = "serde", serde(skip))]
+          #[serde(skip)]
           $field_vis $field_name : OutputTyped<$field_ty>,
         ]
         { $( $node_struct )* }
@@ -587,10 +587,10 @@ macro_rules! impl_node {
       }
 
       #[derive(Clone, Debug, Default)]
-      #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+      #[derive(serde::Serialize, serde::Deserialize)]
       struct Builder;
 
-      #[cfg_attr(feature = "serde", typetag::serde)]
+      #[typetag::serde]
       impl NodeBuilder for Builder {
         fn new_node(&self, _def: &NodeDefinition) -> Box<dyn NodeImpl> {
           Box::new($node_ty_name::new())
@@ -601,7 +601,7 @@ macro_rules! impl_node {
 
       $(#[$node_struct_attr])*
       #[derive(Clone, Debug)]
-      #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+      #[derive(serde::Serialize, serde::Deserialize)]
       pub struct $node_ty_name {
         $( $node_struct_fields )*
       }
@@ -615,7 +615,7 @@ macro_rules! impl_node {
       $( $node_impl )*
 
       $(#[$node_impl_meta])*
-      #[cfg_attr(feature = "serde", typetag::serde)]
+      #[typetag::serde]
       impl NodeImpl for $node_ty_name {
         fn clone_node(&self) -> Box<dyn $crate::NodeImpl> {
           Box::new(self.clone())
@@ -734,7 +734,7 @@ mod test {
         /// Output `color`.
         pub out: Output<Vec2>,
         // Internal node field.
-        #[cfg_attr(feature = "serde", serde(skip))]
+        #[serde(skip)]
         _temp: Vec2,
       }
 

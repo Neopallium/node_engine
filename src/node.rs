@@ -30,7 +30,7 @@ pub fn node_idx(id: NodeId) -> u64 {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct InputId {
   pub node: NodeId,
   pub idx: u32,
@@ -54,7 +54,7 @@ impl InputId {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct OutputId {
   pub node: NodeId,
   pub idx: u32,
@@ -73,7 +73,7 @@ impl OutputId {
   }
 }
 
-#[cfg_attr(feature = "serde", typetag::serde())]
+#[typetag::serde()]
 pub trait NodeImpl: fmt::Debug {
   fn clone_node(&self) -> Box<dyn NodeImpl>;
 
@@ -230,7 +230,7 @@ impl Clone for Box<dyn NodeImpl> {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct EditOnlyNode {
   pub def: NodeDefinition,
   pub inputs: HashMap<String, Input>,
@@ -255,7 +255,7 @@ impl EditOnlyNode {
   }
 }
 
-#[cfg_attr(feature = "serde", typetag::serde)]
+#[typetag::serde]
 impl NodeImpl for EditOnlyNode {
   fn clone_node(&self) -> Box<dyn NodeImpl> {
     Box::new(self.clone())
@@ -309,7 +309,7 @@ impl NodeImpl for EditOnlyNode {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NodeState {
   uuid: Uuid,
   name: String,
@@ -460,16 +460,16 @@ pub trait GetNodeDefinition {
   fn node_definition() -> NodeDefinition;
 }
 
-#[cfg_attr(feature = "serde", typetag::serde())]
+#[typetag::serde()]
 pub trait NodeBuilder: fmt::Debug + Send + Sync + 'static {
   fn new_node(&self, def: &NodeDefinition) -> Box<dyn NodeImpl>;
 }
 
 #[derive(Clone, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct DefaultNodeBuilder;
 
-#[cfg_attr(feature = "serde", typetag::serde)]
+#[typetag::serde]
 impl NodeBuilder for DefaultNodeBuilder {
   fn new_node(&self, def: &NodeDefinition) -> Box<dyn NodeImpl> {
     Box::new(EditOnlyNode::new(def.clone()))
@@ -483,7 +483,7 @@ impl Default for Box<dyn NodeBuilder> {
 }
 
 #[derive(Clone, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NodeDefinition {
   pub name: String,
   pub description: String,
