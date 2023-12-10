@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use slotmap::SlotMap;
-
 use uuid::Uuid;
+
+use indexmap::IndexMap;
 
 use anyhow::{anyhow, Result};
 
@@ -108,7 +108,7 @@ impl EditorState {
 #[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NodeGraph {
   editor: EditorState,
-  nodes: SlotMap<NodeId, NodeState>,
+  nodes: IndexMap<NodeId, NodeState>,
   connections: HashMap<InputId, OutputId>,
   output: Option<NodeId>,
 }
@@ -118,16 +118,22 @@ impl NodeGraph {
     Self::default()
   }
 
-  pub fn add(&mut self, node: NodeState) -> NodeId {
-    self.nodes.insert(node)
+  pub fn add(&mut self, mut node: NodeState) -> NodeId {
+    // Check for duplicate node ids.
+    if self.contains(node.id) {
+      node.id = Uuid::new_v4();
+    }
+    let id = node.id;
+    self.nodes.insert(id, node);
+    id
   }
 
   pub fn remove(&mut self, id: NodeId) -> Option<NodeState> {
-    self.nodes.remove(id)
+    self.nodes.remove(&id)
   }
 
   pub fn contains(&self, id: NodeId) -> bool {
-    self.nodes.contains_key(id)
+    self.nodes.contains_key(&id)
   }
 
   pub fn get_input_id<I: Into<InputKey>>(&self, id: NodeId, idx: I) -> Result<InputId> {
@@ -150,7 +156,7 @@ impl NodeGraph {
     // Get node.
     let node = self
       .nodes
-      .get_mut(id)
+      .get_mut(&id)
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))?;
     // Convert Input key to id.
     let input_id = node.get_input_idx(&key).map(|idx| InputId::new(id, idx))?;
@@ -184,14 +190,14 @@ impl NodeGraph {
   pub fn get(&self, id: NodeId) -> Result<&NodeState> {
     self
       .nodes
-      .get(id)
+      .get(&id)
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))
   }
 
   pub fn get_mut(&mut self, id: NodeId) -> Result<&mut NodeState> {
     self
       .nodes
-      .get_mut(id)
+      .get_mut(&id)
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))
   }
 
@@ -268,8 +274,8 @@ impl NodeGraph {
       ui.set_node_graph_meta(NodeGraphMeta { ui_min, zoom });
 
       // Render nodes.
-      for (id, node) in &mut self.nodes {
-        node.ui_at(ui, origin, id);
+      for (_, node) in &mut self.nodes {
+        node.ui_at(ui, origin);
       }
 
       if ui.input(|i| i.pointer.any_released()) {

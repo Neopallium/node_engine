@@ -1,17 +1,14 @@
 use std::collections::HashMap;
 
-use slotmap::{SecondaryMap, SlotMap};
-
 use anyhow::{anyhow, Result};
 
 use crate::graph::*;
 use crate::node::*;
 use crate::values::*;
 
-slotmap::new_key_type! {
-  /// Code block Id
-  pub struct CodeBlockId;
-}
+/// Code block Id
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
+pub struct CodeBlockId(u32);
 
 #[derive(Clone, Default, Debug)]
 pub struct CodeBlock {
@@ -50,11 +47,12 @@ impl CodeBlock {
 
 #[derive(Default, Debug)]
 pub struct NodeGraphCompile {
-  blocks: SlotMap<CodeBlockId, CodeBlock>,
+  next_id: CodeBlockId,
+  blocks: HashMap<CodeBlockId, CodeBlock>,
   names: HashMap<String, CodeBlockId>,
   block_order: Vec<CodeBlockId>,
   stack: Vec<CodeBlockId>,
-  compiled: SecondaryMap<NodeId, bool>,
+  compiled: HashMap<NodeId, bool>,
 }
 
 impl NodeGraphCompile {
@@ -66,7 +64,9 @@ impl NodeGraphCompile {
     if let Some(&id) = self.names.get(name) {
       return id;
     }
-    let id = self.blocks.insert(CodeBlock::default());
+    let id = CodeBlockId(self.next_id.0 + 1);
+    self.next_id = id;
+    self.blocks.insert(id, CodeBlock::default());
     self.block_order.push(id);
     self.names.insert(name.to_string(), id);
     id
@@ -76,7 +76,7 @@ impl NodeGraphCompile {
     self
       .stack
       .last()
-      .and_then(|&id| self.blocks.get_mut(id))
+      .and_then(|&id| self.blocks.get_mut(&id))
       .ok_or_else(|| anyhow!("No current block on stack"))
   }
 
@@ -115,11 +115,11 @@ impl NodeGraphCompile {
   }
 
   pub fn get_block_by_id(&self, id: CodeBlockId) -> Option<&CodeBlock> {
-    self.blocks.get(id)
+    self.blocks.get(&id)
   }
 
   pub fn get_block_by_id_mut(&mut self, id: CodeBlockId) -> Option<&mut CodeBlock> {
-    self.blocks.get_mut(id)
+    self.blocks.get_mut(&id)
   }
 
   pub fn append_code(&mut self, name: &str, code: String) -> Result<()> {

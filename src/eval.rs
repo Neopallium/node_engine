@@ -1,4 +1,4 @@
-use slotmap::SecondaryMap;
+use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
@@ -15,7 +15,7 @@ pub enum NodeState {
 
 #[derive(Clone, Default, Debug)]
 pub struct NodeGraphExecution {
-  nodes: SecondaryMap<NodeId, NodeState>,
+  nodes: HashMap<NodeId, NodeState>,
 }
 
 impl NodeGraphExecution {
@@ -38,10 +38,10 @@ impl NodeGraphExecution {
   pub fn eval_node(&mut self, graph: &NodeGraph, id: NodeId) -> Result<Value> {
     let node = graph.get(id)?;
     if node.cache_output() {
-      use slotmap::secondary::Entry;
+      use std::collections::hash_map::Entry;
       // Check for cached value or recursive connections.
       match self.nodes.entry(id) {
-        Some(Entry::Occupied(entry)) => match entry.get() {
+        Entry::Occupied(entry) => match entry.get() {
           NodeState::Processing => {
             Err(anyhow!("Recursive node connection"))?;
           }
@@ -49,10 +49,9 @@ impl NodeGraphExecution {
             return Ok(value.clone());
           }
         },
-        Some(Entry::Vacant(entry)) => {
+        Entry::Vacant(entry) => {
           entry.insert(NodeState::Processing);
         }
-        None => Err(anyhow!("Invalid node id: {id:?}"))?,
       }
       // Evaluate node.
       let value = node.eval(graph, self, id)?;

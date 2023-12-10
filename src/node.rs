@@ -12,15 +12,12 @@ use anyhow::{anyhow, Result};
 use crate::ui::*;
 use crate::*;
 
-slotmap::new_key_type! {
-  /// Node Id
-  pub struct NodeId;
-}
+pub type NodeId = Uuid;
 
 pub const NAMESPACE_NODE_IMPL: Uuid = uuid::uuid!("9dee91a8-5af8-11ee-948b-5364d73b1803");
 
 pub fn node_idx(id: NodeId) -> u64 {
-  id.0.as_ffi()
+  id.as_u64_pair().0
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -295,7 +292,7 @@ impl NodeImpl for EditOnlyNode {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NodeState {
-  uuid: Uuid,
+  pub(crate) id: NodeId,
   name: String,
   node: Box<dyn NodeImpl>,
   pub position: emath::Vec2,
@@ -322,7 +319,7 @@ impl core::ops::DerefMut for NodeState {
 impl NodeState {
   pub fn new(def: &NodeDefinition) -> Self {
     Self {
-      uuid: Uuid::new_v4(),
+      id: Uuid::new_v4(),
       name: def.name.clone(),
       node: def.new_node(),
       position: [0., 0.].into(),
@@ -335,7 +332,7 @@ impl NodeState {
   /// Clone node with a new uuid.
   pub fn duplicate(&self) -> Self {
     let mut node = self.clone();
-    node.uuid = Uuid::new_v4();
+    node.id = Uuid::new_v4();
     node
   }
 
@@ -377,7 +374,7 @@ impl NodeState {
     (position, size)
   }
 
-  pub fn ui_at(&mut self, ui: &mut egui::Ui, offset: egui::Vec2, id: NodeId) {
+  pub fn ui_at(&mut self, ui: &mut egui::Ui, offset: egui::Vec2) {
     let node_style = ui.node_style();
     let zoom = node_style.zoom;
     // Apply zoom to node position and size.
@@ -404,15 +401,15 @@ impl NodeState {
     }
     self.updated = false;
 
-    let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.uuid);
-    self.frame_ui(&mut child_ui, node_style, id);
+    let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.id);
+    self.frame_ui(&mut child_ui, node_style);
 
     // Update node size.
     let rect = child_ui.min_rect();
     self.size = rect.size() / zoom;
   }
 
-  fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle, id: NodeId) {
+  fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {
     // Window-style frame.
     let style = ui.style();
     let mut frame = egui::Frame::window(style);
@@ -432,7 +429,7 @@ impl NodeState {
           .fill(egui::Color32::from_gray(63))
           .show(ui, |ui| {
             ui.set_min_width(node_style.node_min_size.x);
-            self.node.ui(ui, id);
+            self.node.ui(ui, self.id);
           });
       });
     });
