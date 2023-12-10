@@ -278,7 +278,9 @@ impl NodeGraph {
         node.ui_at(ui, origin);
       }
 
+      // Handle connecting/disconnecting.
       if ui.input(|i| i.pointer.any_released()) {
+        // Check if a connection was being dragged.
         if let Some((src, dst)) = ui.get_dropped_node_sockets() {
           // Make sure the input is first and that the sockets are compatible.
           if let Some((src, dst)) = src.input_id_first(dst) {
@@ -296,6 +298,7 @@ impl NodeGraph {
           }
         }
       } else if let Some(src) = ui.get_src_node_socket() {
+        // Still dragging a connection.
         if ui.get_dst_node_socket().is_some() {
           ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
         } else {
@@ -334,13 +337,14 @@ impl NodeGraph {
             })
           });
           if let Some((in_meta, out_meta)) = meta {
-            let rect = egui::Rect::from_min_max(
-              (in_meta.center * zoom).to_pos2(),
-              (out_meta.center * zoom).to_pos2(),
-            )
-            .translate(ui_min);
+            // Convert the sockets back to screen-space
+            // and apply zoom.
+            let in_pos = (in_meta.center * zoom).to_pos2() + ui_min;
+            let out_pos = (out_meta.center * zoom).to_pos2() + ui_min;
+            let rect = egui::Rect::from_points(&[in_pos, out_pos]);
+            // Check if part of the connection is visible.
             if ui.is_rect_visible(rect) {
-              painter.line_segment([rect.min, rect.max], node_style.line_stroke);
+              painter.line_segment([in_pos, out_pos], node_style.line_stroke);
             }
           }
         }
