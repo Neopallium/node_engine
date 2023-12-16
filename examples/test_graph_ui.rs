@@ -71,7 +71,7 @@ impl MyEguiApp {
   fn new(_cc: &eframe::CreationContext<'_>) -> Self {
     let reg = build_registry();
     eprintln!("Build shader graph");
-    let (_size, graph) = build_graph(&reg, 3).expect("built graph");
+    let (_size, graph) = build_graph(&reg, 2).expect("built graph");
     Self { graph }
   }
 }
@@ -80,7 +80,15 @@ impl eframe::App for MyEguiApp {
   fn save(&mut self, _storage: &mut dyn eframe::Storage) {
     let json = serde_json::to_string_pretty(&self.graph);
     match json {
-      Ok(json) => eprintln!("graph = {json}"),
+      Ok(json) => {
+        eprintln!("graph.json = {json}");
+        /*
+        // Try round-trip.
+        let graph: NodeGraph = serde_json::from_str(&json)
+          .expect("should decode");
+        eprintln!("graph = {graph:#?}");
+        // */
+      }
       Err(err) => eprintln!("Failed to encode: {err:?}"),
     }
   }

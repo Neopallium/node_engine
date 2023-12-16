@@ -5,13 +5,15 @@ use uuid::Uuid;
 
 use indexmap::IndexMap;
 
+use serde::{de::Deserializer, ser::SerializeSeq, Deserialize, Serialize, Serializer};
+
 use anyhow::{anyhow, Result};
 
 #[cfg(feature = "egui")]
 use crate::ui::*;
 use crate::*;
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 struct NodeRegistryInner {
   nodes: HashMap<Uuid, NodeDefinition>,
   name_to_id: HashMap<String, Uuid>,
@@ -36,7 +38,7 @@ impl NodeRegistryInner {
   }
 }
 
-#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct NodeRegistry(Arc<RwLock<NodeRegistryInner>>);
 
 impl NodeRegistry {
@@ -71,7 +73,7 @@ impl NodeRegistry {
   }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EditorState {
   size: emath::Vec2,
   origin: emath::Vec2,
@@ -105,11 +107,78 @@ impl EditorState {
   }
 }
 
-#[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Default, Debug)]
+struct NodeMap(pub(crate) IndexMap<NodeId, NodeState>);
+
+impl Serialize for NodeMap {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+    for n in self.0.values() {
+      seq.serialize_element(n)?;
+    }
+    seq.end()
+  }
+}
+
+impl<'de> Deserialize<'de> for NodeMap {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    let nodes = Vec::<NodeState>::deserialize(deserializer)?;
+    Ok(Self(nodes.into_iter().map(|n| (n.id, n)).collect()))
+  }
+}
+
+#[derive(Clone, Default, Debug)]
+struct ConnectionMap(pub(crate) IndexMap<InputId, OutputId>);
+
+impl Serialize for ConnectionMap {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    #[derive(Serialize)]
+    struct Connection<'a> {
+      input: &'a InputId,
+      output: &'a OutputId,
+    }
+    let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+    for (input, output) in &self.0 {
+      seq.serialize_element(&Connection { input, output })?;
+    }
+    seq.end()
+  }
+}
+
+impl<'de> Deserialize<'de> for ConnectionMap {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    #[derive(Deserialize)]
+    struct Connection {
+      input: InputId,
+      output: OutputId,
+    }
+    let connections = Vec::<Connection>::deserialize(deserializer)?;
+    Ok(Self(
+      connections
+        .into_iter()
+        .map(|c| (c.input, c.output))
+        .collect(),
+    ))
+  }
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
   editor: EditorState,
-  nodes: IndexMap<NodeId, NodeState>,
-  connections: HashMap<InputId, OutputId>,
+  nodes: NodeMap,
+  connections: ConnectionMap,
   output: Option<NodeId>,
 }
 
@@ -124,16 +193,16 @@ impl NodeGraph {
       node.id = Uuid::new_v4();
     }
     let id = node.id;
-    self.nodes.insert(id, node);
+    self.nodes.0.insert(id, node);
     id
   }
 
   pub fn remove(&mut self, id: NodeId) -> Option<NodeState> {
-    self.nodes.remove(&id)
+    self.nodes.0.remove(&id)
   }
 
   pub fn contains(&self, id: NodeId) -> bool {
-    self.nodes.contains_key(&id)
+    self.nodes.0.contains_key(&id)
   }
 
   pub fn get_input_id<I: Into<InputKey>>(&self, id: NodeId, idx: I) -> Result<InputId> {
@@ -156,16 +225,17 @@ impl NodeGraph {
     // Get node.
     let node = self
       .nodes
+      .0
       .get_mut(&id)
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))?;
     // Convert Input key to id.
     let input_id = node.get_input_idx(&key).map(|idx| InputId::new(id, idx))?;
     match &value {
       Input::Disconnect => {
-        self.connections.remove(&input_id);
+        self.connections.0.remove(&input_id);
       }
       Input::Connect(output_id) => {
-        self.connections.insert(input_id, *output_id);
+        self.connections.0.insert(input_id, *output_id);
       }
       _ => {}
     }
@@ -190,6 +260,7 @@ impl NodeGraph {
   pub fn get(&self, id: NodeId) -> Result<&NodeState> {
     self
       .nodes
+      .0
       .get(&id)
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))
   }
@@ -197,6 +268,7 @@ impl NodeGraph {
   pub fn get_mut(&mut self, id: NodeId) -> Result<&mut NodeState> {
     self
       .nodes
+      .0
       .get_mut(&id)
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))
   }
@@ -274,7 +346,7 @@ impl NodeGraph {
       ui.set_node_graph_meta(NodeGraphMeta { ui_min, zoom });
 
       // Render nodes.
-      for (_, node) in &mut self.nodes {
+      for (_, node) in &mut self.nodes.0 {
         node.ui_at(ui, origin);
       }
 
@@ -327,7 +399,7 @@ impl NodeGraph {
       let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id());
       ui.with_layer_id(layer_id, |ui| {
         let painter = ui.painter();
-        for (input, output) in &self.connections {
+        for (input, output) in &self.connections.0 {
           let in_id = input.ui_id();
           let out_id = output.ui_id();
           let meta = ui.data(|d| {

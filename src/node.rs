@@ -56,7 +56,7 @@ impl OutputId {
   }
 }
 
-#[typetag::serde()]
+#[typetag::serde(tag = "node_type")]
 pub trait NodeImpl: fmt::Debug {
   fn clone_node(&self) -> Box<dyn NodeImpl>;
 
