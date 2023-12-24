@@ -1821,6 +1821,7 @@ dependencies = [
  "glam",
  "heck",
  "indexmap",
+ "inventory",
  "lazy_static",
  "log",
  "serde",

@@ -559,7 +559,9 @@ macro_rules! impl_node {
 
       lazy_static::lazy_static! {
         pub static ref DEFINITION: $crate::NodeDefinition = {
-          let mut def = $crate::NodeDefinition::default();
+          let mut def = $crate::NodeDefinition::builder(|_| {
+            Box::new($node_ty_name::new())
+          });
           def.name = $node_name.to_string();
           $( def.description = $node_description.to_string(); )?
           $(
@@ -580,21 +582,14 @@ macro_rules! impl_node {
               def.custom.insert(stringify!($custom_field_name).to_string(), $custom_field_value.to_string());
             )*
           )?
-          def.builder = std::sync::Arc::new(Box::new(Builder));
+          def.source_file = file!().to_string();
 
           def
         };
       }
 
-      #[derive(Clone, Debug, Default)]
-      #[derive(serde::Serialize, serde::Deserialize)]
-      struct Builder;
-
-      #[typetag::serde]
-      impl NodeBuilder for Builder {
-        fn new_node(&self, _def: &NodeDefinition) -> Box<dyn NodeImpl> {
-          Box::new($node_ty_name::new())
-        }
+      $crate::register_node! {
+        DEFINITION.clone()
       }
 
       $( $extra_code )*
@@ -604,12 +599,6 @@ macro_rules! impl_node {
       #[derive(serde::Serialize, serde::Deserialize)]
       pub struct $node_ty_name {
         $( $node_struct_fields )*
-      }
-
-      impl GetNodeDefinition for $node_ty_name {
-        fn node_definition() -> NodeDefinition {
-          DEFINITION.clone()
-        }
       }
 
       $( $node_impl )*
@@ -769,6 +758,5 @@ mod test {
       "   - json: {}",
       serde_json::to_string_pretty(&node).unwrap()
     );
-    reg.register::<TestNode>();
   }
 }

@@ -1,8 +1,5 @@
 use core::fmt;
 use std::collections::HashMap;
-use std::sync::Arc;
-
-use indexmap::IndexMap;
 
 use uuid::Uuid;
 
@@ -428,93 +425,5 @@ impl NodeState {
           });
       });
     });
-  }
-}
-
-pub trait GetNodeDefinition {
-  fn node_definition() -> NodeDefinition;
-}
-
-#[typetag::serde()]
-pub trait NodeBuilder: fmt::Debug + Send + Sync + 'static {
-  fn new_node(&self, def: &NodeDefinition) -> Box<dyn NodeImpl>;
-}
-
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct DefaultNodeBuilder;
-
-#[typetag::serde]
-impl NodeBuilder for DefaultNodeBuilder {
-  fn new_node(&self, def: &NodeDefinition) -> Box<dyn NodeImpl> {
-    Box::new(EditOnlyNode::new(def.clone()))
-  }
-}
-
-impl Default for Box<dyn NodeBuilder> {
-  fn default() -> Self {
-    Box::new(DefaultNodeBuilder)
-  }
-}
-
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct NodeDefinition {
-  pub name: String,
-  pub description: String,
-  pub categories: Vec<String>,
-  pub uuid: Uuid,
-  pub parameters: IndexMap<String, ParameterDefinition>,
-  pub inputs: IndexMap<String, InputDefinition>,
-  pub outputs: IndexMap<String, OutputDefinition>,
-  pub custom: IndexMap<String, String>,
-  pub builder: Arc<Box<dyn NodeBuilder>>,
-}
-
-impl NodeDefinition {
-  pub fn matches(&self, filter: &NodeFilter) -> bool {
-    self.name.to_lowercase().contains(&filter.name.to_lowercase())
-  }
-
-  pub fn new_node(&self) -> Box<dyn NodeImpl> {
-    self.builder.new_node(self)
-  }
-
-  pub fn parameters(&self) -> impl Iterator<Item = (&String, &ParameterDefinition)> {
-    self.parameters.iter()
-  }
-
-  pub fn inputs(&self) -> impl Iterator<Item = (&String, &InputDefinition)> {
-    self.inputs.iter()
-  }
-
-  pub fn outputs(&self) -> impl Iterator<Item = (&String, &OutputDefinition)> {
-    self.outputs.iter()
-  }
-
-  pub fn get_input_idx(&self, idx: &InputKey) -> Result<u32> {
-    match idx {
-      InputKey::Idx(idx) => Ok(*idx),
-      InputKey::Name(name) => {
-        let idx = self
-          .inputs
-          .get_index_of(name)
-          .ok_or_else(|| anyhow::anyhow!("Invalid input: {name}"))?;
-        Ok(idx as _)
-      }
-    }
-  }
-
-  pub fn get_input(&self, idx: &InputKey) -> Option<&InputDefinition> {
-    match idx {
-      InputKey::Idx(idx) => self.inputs.get_index(*idx as _).map(|(_, v)| v),
-      InputKey::Name(name) => self.inputs.get(name),
-    }
-  }
-
-  pub fn get_parameter(&self, name: &str) -> Option<&ParameterDefinition> {
-    self.parameters.get(name)
-  }
-
-  pub fn get_output(&self, name: &str) -> Option<&OutputDefinition> {
-    self.outputs.get(name)
   }
 }

@@ -89,10 +89,3 @@ impl_math_node!(scalar_f32, ScalarMath, f32, "Scalar Math");
 impl_math_node!(vec2, Vec2Math, Vec2, "Vec2 Math");
 impl_math_node!(vec3, Vec3Math, Vec3, "Vec3 Math");
 impl_math_node!(vec4, Vec4Math, Vec4, "Vec4 Math");
-
-pub fn register(reg: &NodeRegistry) {
-  reg.register::<ScalarMath>();
-  reg.register::<Vec2Math>();
-  reg.register::<Vec3Math>();
-  reg.register::<Vec4Math>();
-}

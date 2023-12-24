@@ -4,6 +4,8 @@ pub mod values;
 pub use values::*;
 pub mod node;
 pub use node::*;
+pub mod registry;
+pub use registry::*;
 pub mod graph;
 pub use graph::*;
 pub mod macros;

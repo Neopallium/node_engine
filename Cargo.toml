@@ -25,6 +25,7 @@ egui = { version = "0.23.0", optional = true }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1" }
 typetag = { version = "0.2" }
+inventory = { version = "0.3" }
 heck = "0.4"
 
 glam = { version = "0.24", features = ["serde"] }

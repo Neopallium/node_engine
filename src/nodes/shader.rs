@@ -103,8 +103,3 @@ fn fragment(
     }
   }
 }
-
-pub fn register(reg: &NodeRegistry) {
-  reg.register::<FragmentOutputNode>();
-  reg.register::<UVNode>();
-}
