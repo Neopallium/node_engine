@@ -38,9 +38,9 @@ impl NodeRegistryInner {
     self.nodes.values().cloned().collect()
   }
 
-  fn register(&mut self, def: NodeDefinition) -> Option<NodeDefinition> {
+  fn register(&mut self, def: &NodeDefinition) -> Option<NodeDefinition> {
     self.name_to_id.insert(def.name.clone(), def.uuid);
-    self.nodes.insert(def.uuid, def)
+    self.nodes.insert(def.uuid, def.clone())
   }
 
   fn new_by_name(&self, name: &str) -> Option<NodeState> {
@@ -86,7 +86,7 @@ impl NodeRegistry {
     inner.nodes()
   }
 
-  pub fn register(&self, def: NodeDefinition) -> Option<NodeDefinition> {
+  pub fn register(&self, def: &NodeDefinition) -> Option<NodeDefinition> {
     let mut inner = self.0.write().unwrap();
     inner.register(def)
   }
@@ -110,7 +110,7 @@ impl NodeRegistry {
 
 #[derive(Clone, Debug)]
 pub struct RegisterNode {
-  pub definition: fn() -> NodeDefinition,
+  pub get_def: fn() -> NodeDefinition,
 }
 inventory::collect!(RegisterNode);
 
@@ -118,10 +118,11 @@ impl RegisterNode {
   pub fn register_nodes() -> NodeRegistry {
     let registry = NodeRegistry::new();
     for reg in inventory::iter::<RegisterNode> {
-      let def = (reg.definition)();
-      if let Some(prev) = registry.register(def.clone()) {
+      let def = (reg.get_def)();
+      if let Some(prev) = registry.register(&def) {
         log::error!(
-          "Node definition re-defined at {}, prev definition: {}",
+          "Node {:?} re-defined at {}, prev definition at: {}",
+          def.name,
           def.source_file,
           prev.source_file
         );
@@ -130,8 +131,8 @@ impl RegisterNode {
     registry
   }
 
-  pub const fn new(definition: fn() -> NodeDefinition) -> Self {
-    Self { definition }
+  pub const fn new(get_def: fn() -> NodeDefinition) -> Self {
+    Self { get_def }
   }
 }
 
@@ -189,10 +190,13 @@ pub struct NodeDefinition {
 }
 
 impl NodeDefinition {
-  pub fn builder(create: fn(&NodeDefinition) -> Box<dyn NodeImpl>) -> Self {
-    let mut def = Self::default();
-    def.builder = Arc::new(Box::new(NodeBuilderFn(create)));
-    def
+  pub fn new(name: &str, create: fn(&NodeDefinition) -> Box<dyn NodeImpl>) -> Self {
+    Self {
+      name: name.to_string(),
+      uuid: uuid::Uuid::new_v5(&NAMESPACE_NODE_IMPL, name.as_bytes()),
+      builder: Arc::new(Box::new(NodeBuilderFn(create))),
+      ..Default::default()
+    }
   }
 
   pub fn matches(&self, filter: &NodeFilter) -> bool {

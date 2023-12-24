@@ -559,15 +559,13 @@ macro_rules! impl_node {
 
       lazy_static::lazy_static! {
         pub static ref DEFINITION: $crate::NodeDefinition = {
-          let mut def = $crate::NodeDefinition::builder(|_| {
+          let mut def = $crate::NodeDefinition::new($node_name, |_| {
             Box::new($node_ty_name::new())
           });
-          def.name = $node_name.to_string();
           $( def.description = $node_description.to_string(); )?
           $(
             def.categories = $node_categories.iter().map(|c| c.to_string()).collect();
           )?
-          def.uuid = uuid::Uuid::new_v5(&$crate::node::NAMESPACE_NODE_IMPL, $node_name.as_bytes());
           def.inputs = [
             $( InputDefinition::typed::<$field_input_ty>(stringify!($field_input_name)) ),*
           ].into();
