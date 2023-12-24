@@ -142,10 +142,7 @@ impl NodeGraph {
     self.connections.0.retain(|input, output| {
       if output.node() == id {
         // Need to disconnect inputs from the nodes outputs.
-        let node = self
-          .nodes
-          .0
-          .get_mut(&input.node());
+        let node = self.nodes.0.get_mut(&input.node());
         if let Some(node) = node {
           if let Err(err) = node.set_input(*input, Input::Disconnect) {
             log::warn!("Failed to disconnect from input node: {err:?}");
@@ -423,9 +420,11 @@ impl NodeGraphEditor {
         egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
           ui.label("TODO: Node finder here");
         });
-        let resp = egui::CentralPanel::default().show_inside(ui, |ui| {
-          self.graph.ui(ui);
-        }).response;
+        let resp = egui::CentralPanel::default()
+          .show_inside(ui, |ui| {
+            self.graph.ui(ui);
+          })
+          .response;
         // Graph menu.
         resp.context_menu(|ui| {
           if self.next_position.is_none() {

@@ -21,9 +21,7 @@ impl NodeFilter {
   #[cfg(feature = "egui")]
   pub fn ui(&mut self, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-      ui.add(egui::TextEdit::singleline(&mut self.name)
-          .hint_text("Filter nodes")
-        )
+      ui.add(egui::TextEdit::singleline(&mut self.name).hint_text("Filter nodes"))
         .request_focus();
     });
   }
@@ -122,7 +120,11 @@ impl RegisterNode {
     for reg in inventory::iter::<RegisterNode> {
       let def = (reg.definition)();
       if let Some(prev) = registry.register(def.clone()) {
-        log::error!("Node definition re-defined at {}, prev definition: {}", def.source_file, prev.source_file);
+        log::error!(
+          "Node definition re-defined at {}, prev definition: {}",
+          def.source_file,
+          prev.source_file
+        );
       }
     }
     registry
@@ -150,8 +152,7 @@ pub trait NodeBuilder: Send + Sync {
 
 impl fmt::Debug for Box<dyn NodeBuilder> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-    f.debug_tuple("NodeBuilder")
-      .finish()
+    f.debug_tuple("NodeBuilder").finish()
   }
 }
 
@@ -195,7 +196,10 @@ impl NodeDefinition {
   }
 
   pub fn matches(&self, filter: &NodeFilter) -> bool {
-    self.name.to_lowercase().contains(&filter.name.to_lowercase())
+    self
+      .name
+      .to_lowercase()
+      .contains(&filter.name.to_lowercase())
   }
 
   pub fn new_node(&self) -> Box<dyn NodeImpl> {
