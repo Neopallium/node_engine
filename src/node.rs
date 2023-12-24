@@ -368,7 +368,7 @@ impl NodeState {
     (position, size)
   }
 
-  pub fn ui_at(&mut self, ui: &mut egui::Ui, offset: egui::Vec2) {
+  pub fn ui_at(&mut self, ui: &mut egui::Ui, offset: egui::Vec2) -> egui::Response {
     let node_style = ui.node_style();
     let zoom = node_style.zoom;
     // Apply zoom to node position and size.
@@ -391,7 +391,7 @@ impl NodeState {
     if !self.updated && !ui.is_rect_visible(rect) {
       // This is needed to stabilize Ui ids when nodes become visible.
       ui.skip_ahead_auto_ids(1);
-      return;
+      return resp;
     }
     self.updated = false;
 
@@ -401,6 +401,7 @@ impl NodeState {
     // Update node size.
     let rect = child_ui.min_rect();
     self.size = rect.size() / zoom;
+    resp
   }
 
   fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {
@@ -469,6 +470,10 @@ pub struct NodeDefinition {
 }
 
 impl NodeDefinition {
+  pub fn matches(&self, filter: &NodeFilter) -> bool {
+    self.name.to_lowercase().contains(&filter.name.to_lowercase())
+  }
+
   pub fn new_node(&self) -> Box<dyn NodeImpl> {
     self.builder.new_node(self)
   }

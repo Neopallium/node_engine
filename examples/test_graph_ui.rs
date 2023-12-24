@@ -3,6 +3,7 @@ use glam::Vec4;
 use node_engine::*;
 
 fn main() {
+  env_logger::init();
   let native_options = eframe::NativeOptions {
     initial_window_size: Some(egui::vec2(1000., 600.)),
     ..Default::default()
@@ -64,7 +65,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
 
 #[derive(Default)]
 struct MyEguiApp {
-  graph: NodeGraph,
+  editor: NodeGraphEditor,
 }
 
 impl MyEguiApp {
@@ -72,13 +73,15 @@ impl MyEguiApp {
     let reg = build_registry();
     eprintln!("Build shader graph");
     let (_size, graph) = build_graph(&reg, 2).expect("built graph");
-    Self { graph }
+    let mut editor = NodeGraphEditor::new();
+    editor.graph = graph;
+    Self { editor }
   }
 }
 
 impl eframe::App for MyEguiApp {
   fn save(&mut self, _storage: &mut dyn eframe::Storage) {
-    let json = serde_json::to_string_pretty(&self.graph);
+    let json = serde_json::to_string_pretty(&self.editor.graph);
     match json {
       Ok(json) => {
         eprintln!("graph.json = {json}");
@@ -97,6 +100,6 @@ impl eframe::App for MyEguiApp {
     if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
       frame.close();
     }
-    self.graph.show(ctx);
+    self.editor.show(ctx);
   }
 }

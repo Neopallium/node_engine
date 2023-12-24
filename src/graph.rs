@@ -13,6 +13,23 @@ use anyhow::{anyhow, Result};
 use crate::ui::*;
 use crate::*;
 
+#[derive(Clone, Default, Debug)]
+pub struct NodeFilter {
+  pub name: String,
+}
+
+impl NodeFilter {
+  #[cfg(feature = "egui")]
+  pub fn ui(&mut self, ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+      ui.add(egui::TextEdit::singleline(&mut self.name)
+          .hint_text("Filter nodes")
+        )
+        .request_focus();
+    });
+  }
+}
+
 #[derive(Default, Debug, Serialize, Deserialize)]
 struct NodeRegistryInner {
   nodes: HashMap<Uuid, NodeDefinition>,
@@ -36,9 +53,24 @@ impl NodeRegistryInner {
   fn new_by_id(&self, id: Uuid) -> Option<NodeState> {
     self.nodes.get(&id).map(NodeState::new)
   }
+
+  #[cfg(feature = "egui")]
+  pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<NodeState> {
+    let mut selected_node = None;
+    ui.group(|ui| {
+      for def in self.nodes.values() {
+        if def.matches(filter) {
+          if ui.button(&def.name).clicked() {
+            selected_node = Some(NodeState::new(def));
+          }
+        }
+      }
+    });
+    selected_node
+  }
 }
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeRegistry(Arc<RwLock<NodeRegistryInner>>);
 
 impl NodeRegistry {
@@ -71,6 +103,12 @@ impl NodeRegistry {
     let inner = self.0.read().unwrap();
     inner.new_by_name(name)
   }
+
+  #[cfg(feature = "egui")]
+  pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<NodeState> {
+    let inner = self.0.write().unwrap();
+    inner.ui(ui, filter)
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,6 +117,8 @@ pub struct EditorState {
   origin: emath::Vec2,
   zoom: f32,
   scroll_offset: emath::Vec2,
+  #[serde(skip)]
+  current_pos: emath::Vec2,
 }
 
 impl Default for EditorState {
@@ -90,6 +130,7 @@ impl Default for EditorState {
       origin,
       zoom: 0.5,
       scroll_offset: origin - emath::vec2(450., 250.),
+      current_pos: Default::default(),
     }
   }
 }
@@ -198,6 +239,29 @@ impl NodeGraph {
   }
 
   pub fn remove(&mut self, id: NodeId) -> Option<NodeState> {
+    // Remove all connections to the node.
+    self.connections.0.retain(|input, output| {
+      if output.node() == id {
+        // Need to disconnect inputs from the nodes outputs.
+        let node = self
+          .nodes
+          .0
+          .get_mut(&input.node());
+        if let Some(node) = node {
+          if let Err(err) = node.set_input(*input, Input::Disconnect) {
+            log::warn!("Failed to disconnect from input node: {err:?}");
+          }
+        }
+        false
+      } else if input.node() == id {
+        // We can just remove the nodes own inputs.
+        false
+      } else {
+        // Keep
+        true
+      }
+    });
+    // Remove node.
     self.nodes.0.remove(&id)
   }
 
@@ -280,26 +344,9 @@ impl NodeGraph {
   pub fn output(&self) -> Option<NodeId> {
     self.output
   }
-}
 
-#[cfg(feature = "egui")]
-impl NodeGraph {
-  pub fn show(&mut self, ctx: &egui::Context) {
-    egui::Window::new("Graph editor")
-      .default_size((900., 500.))
-      .show(ctx, |ui| {
-        egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
-          ui.label("zoom:");
-          ui.add(egui::Slider::new(&mut self.editor.zoom, 0.1..=1.0).text("Zoom"));
-          ui.label("TODO: Node finder here");
-        });
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-          self.node_graph_ui(ui);
-        });
-      });
-  }
-
-  fn node_graph_ui(&mut self, ui: &mut egui::Ui) {
+  #[cfg(feature = "egui")]
+  pub fn ui(&mut self, ui: &mut egui::Ui) {
     // Use mouse wheel for zoom instead of scrolling.
     // Mouse wheel + ctrl scrolling left/right.
     // Multitouch (pinch gesture) zoom.
@@ -345,9 +392,26 @@ impl NodeGraph {
       let origin = origin + ui_min;
       ui.set_node_graph_meta(NodeGraphMeta { ui_min, zoom });
 
+      // Convert pointer position to graph-space.  (Used for adding new nodes).
+      if ui.ui_contains_pointer() {
+        if let Some(pos) = ui.ctx().pointer_latest_pos() {
+          self.editor.current_pos = (pos - origin).to_vec2() / zoom;
+        }
+      }
+
       // Render nodes.
-      for (_, node) in &mut self.nodes.0 {
-        node.ui_at(ui, origin);
+      let mut remove_node = None;
+      for (node_id, node) in &mut self.nodes.0 {
+        node.ui_at(ui, origin).context_menu(|ui| {
+          if ui.button("Delete").clicked() {
+            remove_node = Some(*node_id);
+            ui.close_menu();
+          }
+        });
+      }
+      // Handle removing a node.
+      if let Some(node_id) = remove_node {
+        self.remove(node_id);
       }
 
       // Handle connecting/disconnecting.
@@ -387,45 +451,97 @@ impl NodeGraph {
             .data(|d| d.get_temp::<NodeSocketMeta>(src.ui_id()))
             .unwrap();
           let center = (src_meta.center * zoom).to_pos2() + ui_min;
-          let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id());
-          ui.with_layer_id(layer_id, |ui| {
-            ui.painter()
-              .line_segment([center, end], node_style.line_stroke);
-          });
+          ui.painter()
+            .line_segment([center, end], node_style.line_stroke);
         }
       }
 
       // Draw connections.
-      let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id());
-      ui.with_layer_id(layer_id, |ui| {
-        let painter = ui.painter();
-        for (input, output) in &self.connections.0 {
-          let in_id = input.ui_id();
-          let out_id = output.ui_id();
-          let meta = ui.data(|d| {
-            d.get_temp::<NodeSocketMeta>(in_id).and_then(|in_meta| {
-              d.get_temp::<NodeSocketMeta>(out_id)
-                .map(|out_meta| (in_meta, out_meta))
-            })
-          });
-          if let Some((in_meta, out_meta)) = meta {
-            // Convert the sockets back to screen-space
-            // and apply zoom.
-            let in_pos = (in_meta.center * zoom).to_pos2() + ui_min;
-            let out_pos = (out_meta.center * zoom).to_pos2() + ui_min;
-            let rect = egui::Rect::from_points(&[in_pos, out_pos]);
-            // Check if part of the connection is visible.
-            if ui.is_rect_visible(rect) {
-              painter.line_segment([in_pos, out_pos], node_style.line_stroke);
-            }
+      let painter = ui.painter();
+      for (input, output) in &self.connections.0 {
+        let in_id = input.ui_id();
+        let out_id = output.ui_id();
+        let meta = ui.data(|d| {
+          d.get_temp::<NodeSocketMeta>(in_id).and_then(|in_meta| {
+            d.get_temp::<NodeSocketMeta>(out_id)
+              .map(|out_meta| (in_meta, out_meta))
+          })
+        });
+        if let Some((in_meta, out_meta)) = meta {
+          // Convert the sockets back to screen-space
+          // and apply zoom.
+          let in_pos = (in_meta.center * zoom).to_pos2() + ui_min;
+          let out_pos = (out_meta.center * zoom).to_pos2() + ui_min;
+          let rect = egui::Rect::from_points(&[in_pos, out_pos]);
+          // Check if part of the connection is visible.
+          if ui.is_rect_visible(rect) {
+            painter.line_segment([in_pos, out_pos], node_style.line_stroke);
           }
         }
-      });
+      }
 
       // Restore old NodeStyle.
       ui.set_node_style(old_node_style);
     });
     // Save scroll offset and de-zoom it.
     self.editor.scroll_offset = resp.state.offset / zoom;
+  }
+}
+
+#[derive(Clone)]
+#[cfg(feature = "egui")]
+pub struct NodeGraphEditor {
+  pub size: emath::Vec2,
+  pub graph: NodeGraph,
+  pub registry: NodeRegistry,
+  pub node_filter: NodeFilter,
+  next_position: Option<emath::Vec2>,
+}
+
+#[cfg(feature = "egui")]
+impl Default for NodeGraphEditor {
+  fn default() -> Self {
+    Self {
+      size: (900., 500.).into(),
+      graph: Default::default(),
+      registry: build_registry(),
+      node_filter: Default::default(),
+      next_position: None,
+    }
+  }
+}
+
+#[cfg(feature = "egui")]
+impl NodeGraphEditor {
+  pub fn new() -> Self {
+    Self::default()
+  }
+
+  pub fn show(&mut self, ctx: &egui::Context) {
+    egui::Window::new("Graph editor")
+      .default_size(self.size)
+      .show(ctx, |ui| {
+        egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
+          ui.label("TODO: Node finder here");
+        });
+        let resp = egui::CentralPanel::default().show_inside(ui, |ui| {
+          self.graph.ui(ui);
+        }).response;
+        // Graph menu.
+        resp.context_menu(|ui| {
+          if self.next_position.is_none() {
+            self.next_position = Some(self.graph.editor.current_pos);
+          }
+          // Node filter UI first.
+          self.node_filter.ui(ui);
+          if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
+            if let Some(position) = self.next_position.take() {
+              node.position = position;
+            }
+            self.graph.add(node);
+            ui.close_menu();
+          }
+        });
+      });
   }
 }
