@@ -5,6 +5,8 @@ use uuid::Uuid;
 
 use anyhow::{anyhow, Result};
 
+use serde::{de::Deserializer, ser::SerializeMap, Deserialize, Serialize, Serializer};
+
 #[cfg(feature = "egui")]
 use crate::ui::*;
 use crate::*;
@@ -53,8 +55,7 @@ impl OutputId {
   }
 }
 
-#[typetag::serde(tag = "node_type")]
-pub trait NodeImpl: fmt::Debug {
+pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
   fn clone_node(&self) -> Box<dyn NodeImpl>;
 
   fn def(&self) -> &NodeDefinition;
@@ -175,6 +176,48 @@ pub trait NodeImpl: fmt::Debug {
   }
 }
 
+struct NodeData<'a, N: ?Sized>(&'a N);
+
+impl<'a, N> Serialize for NodeData<'a, N>
+where
+  N: ?Sized + erased_serde::Serialize + 'a,
+{
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    erased_serde::serialize(self.0, serializer)
+  }
+}
+
+impl Serialize for dyn NodeImpl {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    let mut ser = serializer.serialize_map(Some(1))?;
+    let node_type = self.def().uuid;
+    ser.serialize_entry(&node_type, &NodeData(self))?;
+    ser.end()
+  }
+}
+
+impl<'de> Deserialize<'de> for Box<dyn NodeImpl> {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    let map = HashMap::<Uuid, serde_json::Value>::deserialize(deserializer)?;
+    let (id, node) = map
+      .into_iter()
+      .next()
+      .ok_or_else(|| serde::de::Error::custom("Node missing implementation data"))?;
+    NODE_REGISTRY
+      .load_node(id, node)
+      .map_err(serde::de::Error::custom)
+  }
+}
+
 /// Define some generic helper methods for Nodes.
 ///
 /// Boxed trait objects can't have generic methods.
@@ -234,7 +277,6 @@ impl EditOnlyNode {
   }
 }
 
-#[typetag::serde]
 impl NodeImpl for EditOnlyNode {
   fn clone_node(&self) -> Box<dyn NodeImpl> {
     Box::new(self.clone())
@@ -292,7 +334,7 @@ pub struct NodeState {
   pub(crate) id: NodeId,
   name: String,
   node: Box<dyn NodeImpl>,
-  pub position: emath::Vec2,
+  position: emath::Vec2,
   size: emath::Vec2,
   #[serde(skip)]
   updated: bool,
@@ -300,16 +342,20 @@ pub struct NodeState {
 }
 
 impl NodeState {
-  pub fn new(def: &NodeDefinition) -> Self {
-    Self {
+  pub fn new(def: &NodeDefinition) -> Result<Self> {
+    Ok(Self {
       id: Uuid::new_v4(),
       name: def.name.clone(),
-      node: def.new_node(),
+      node: def.new_node()?,
       position: [0., 0.].into(),
       size: [10., 10.].into(),
       updated: true,
       selected: false,
-    }
+    })
+  }
+
+  pub fn set_position(&mut self, position: emath::Vec2) {
+    self.position = position;
   }
 
   /// Clone node with a new uuid.

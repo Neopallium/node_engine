@@ -559,8 +559,12 @@ macro_rules! impl_node {
 
       lazy_static::lazy_static! {
         pub static ref DEFINITION: $crate::NodeDefinition = {
-          let mut def = $crate::NodeDefinition::new($node_name, |_| {
-            Box::new($node_ty_name::new())
+          let mut def = $crate::NodeDefinition::new($node_name, |_, data| {
+            use serde::Deserialize;
+            Ok(Box::new(match data {
+              Some(data) => $node_ty_name::deserialize(data)?,
+              None => $node_ty_name::new(),
+            }))
           });
           $( def.description = $node_description.to_string(); )?
           $(
@@ -602,7 +606,6 @@ macro_rules! impl_node {
       $( $node_impl )*
 
       $(#[$node_impl_meta])*
-      #[typetag::serde]
       impl NodeImpl for $node_ty_name {
         fn clone_node(&self) -> Box<dyn $crate::NodeImpl> {
           Box::new(self.clone())

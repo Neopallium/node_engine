@@ -434,7 +434,7 @@ impl NodeGraphEditor {
           self.node_filter.ui(ui);
           if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
             if let Some(position) = self.next_position.take() {
-              node.position = position;
+              node.set_position(position);
             }
             self.graph.add(node);
             ui.close_menu();

@@ -37,7 +37,7 @@ fn build_sub_graph(
     (0, Input::from(Vec4::ONE), Input::from(Vec4::ONE))
   };
   let mut node = node.duplicate();
-  node.position = position;
+  node.set_position(position);
   let id = graph.add(node);
   graph.set_node_input(id, "A", a)?;
   graph.set_node_input(id, "B", b)?;
@@ -55,7 +55,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
   let mut frag = reg
     .new_by_name("Fragment output")
     .expect("Fragment output node");
-  frag.position = position;
+  frag.set_position(position);
   let output_id = graph.add(frag);
   graph.set_node_input(output_id, "Color", Input::from(id))?;
   graph.set_output(Some(output_id));
@@ -87,8 +87,7 @@ impl eframe::App for MyEguiApp {
         eprintln!("graph.json = {json}");
         /*
         // Try round-trip.
-        let graph: NodeGraph = serde_json::from_str(&json)
-          .expect("should decode");
+        let graph: NodeGraph = serde_json::from_str(&json).expect("should decode");
         eprintln!("graph = {graph:#?}");
         // */
       }

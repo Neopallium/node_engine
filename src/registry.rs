@@ -12,6 +12,24 @@ use serde::{Deserialize, Serialize};
 
 use crate::*;
 
+lazy_static::lazy_static! {
+  pub static ref NODE_REGISTRY: NodeRegistry = {
+    let registry = NodeRegistry::new();
+    for reg in inventory::iter::<RegisterNode> {
+      let def = (reg.get_def)();
+      if let Some(prev) = registry.register(&def) {
+        log::error!(
+          "Node {:?} re-defined at {}, prev definition at: {}",
+          def.name,
+          def.source_file,
+          prev.source_file
+        );
+      }
+    }
+    registry
+  };
+}
+
 #[derive(Clone, Default, Debug)]
 pub struct NodeFilter {
   pub name: String,
@@ -43,12 +61,28 @@ impl NodeRegistryInner {
     self.nodes.insert(def.uuid, def.clone())
   }
 
-  fn new_by_name(&self, name: &str) -> Option<NodeState> {
-    self.name_to_id.get(name).and_then(|&id| self.new_by_id(id))
+  pub fn load_node(&self, id: Uuid, data: serde_json::Value) -> Result<Box<dyn NodeImpl>> {
+    let def = self
+      .nodes
+      .get(&id)
+      .ok_or_else(|| anyhow!("Missing Node definition: {id:?}"))?;
+    def.load_node(data)
   }
 
-  fn new_by_id(&self, id: Uuid) -> Option<NodeState> {
-    self.nodes.get(&id).map(NodeState::new)
+  fn new_by_name(&self, name: &str) -> Result<NodeState> {
+    let id = self
+      .name_to_id
+      .get(name)
+      .ok_or_else(|| anyhow!("Missing Node definition: {name:?}"))?;
+    self.new_by_id(*id)
+  }
+
+  fn new_by_id(&self, id: Uuid) -> Result<NodeState> {
+    let def = self
+      .nodes
+      .get(&id)
+      .ok_or_else(|| anyhow!("Missing Node definition: {id:?}"))?;
+    NodeState::new(def)
   }
 
   #[cfg(feature = "egui")]
@@ -58,7 +92,7 @@ impl NodeRegistryInner {
       for def in self.nodes.values() {
         if def.matches(filter) {
           if ui.button(&def.name).clicked() {
-            selected_node = Some(NodeState::new(def));
+            selected_node = Some(NodeState::new(def).expect("Node building shouldn't fail"));
           }
         }
       }
@@ -78,7 +112,7 @@ impl NodeRegistry {
 
   /// Build node registry from all node definitions.
   pub fn build() -> Self {
-    RegisterNode::register_nodes()
+    NODE_REGISTRY.clone()
   }
 
   pub fn nodes(&self) -> Vec<NodeDefinition> {
@@ -91,12 +125,17 @@ impl NodeRegistry {
     inner.register(def)
   }
 
-  pub fn new_by_id(&self, id: Uuid) -> Option<NodeState> {
+  pub fn load_node(&self, id: Uuid, data: serde_json::Value) -> Result<Box<dyn NodeImpl>> {
+    let inner = self.0.read().unwrap();
+    inner.load_node(id, data)
+  }
+
+  pub fn new_by_id(&self, id: Uuid) -> Result<NodeState> {
     let inner = self.0.read().unwrap();
     inner.new_by_id(id)
   }
 
-  pub fn new_by_name(&self, name: &str) -> Option<NodeState> {
+  pub fn new_by_name(&self, name: &str) -> Result<NodeState> {
     let inner = self.0.read().unwrap();
     inner.new_by_name(name)
   }
@@ -115,22 +154,6 @@ pub struct RegisterNode {
 inventory::collect!(RegisterNode);
 
 impl RegisterNode {
-  pub fn register_nodes() -> NodeRegistry {
-    let registry = NodeRegistry::new();
-    for reg in inventory::iter::<RegisterNode> {
-      let def = (reg.get_def)();
-      if let Some(prev) = registry.register(&def) {
-        log::error!(
-          "Node {:?} re-defined at {}, prev definition at: {}",
-          def.name,
-          def.source_file,
-          prev.source_file
-        );
-      }
-    }
-    registry
-  }
-
   pub const fn new(get_def: fn() -> NodeDefinition) -> Self {
     Self { get_def }
   }
@@ -148,7 +171,11 @@ macro_rules! register_node {
 }
 
 pub trait NodeBuilder: Send + Sync {
-  fn new_node(&self, def: &NodeDefinition) -> Box<dyn NodeImpl>;
+  fn new_node(
+    &self,
+    def: &NodeDefinition,
+    data: Option<serde_json::Value>,
+  ) -> Result<Box<dyn NodeImpl>>;
 }
 
 impl fmt::Debug for Box<dyn NodeBuilder> {
@@ -159,17 +186,23 @@ impl fmt::Debug for Box<dyn NodeBuilder> {
 
 impl Default for Box<dyn NodeBuilder> {
   fn default() -> Self {
-    Box::new(NodeBuilderFn(|def| {
-      Box::new(EditOnlyNode::new(def.clone()))
+    Box::new(NodeBuilderFn(|def, _| {
+      Ok(Box::new(EditOnlyNode::new(def.clone())))
     }))
   }
 }
 
-pub struct NodeBuilderFn(fn(&NodeDefinition) -> Box<dyn NodeImpl>);
+pub struct NodeBuilderFn(
+  fn(&NodeDefinition, Option<serde_json::Value>) -> Result<Box<dyn NodeImpl>>,
+);
 
 impl NodeBuilder for NodeBuilderFn {
-  fn new_node(&self, def: &NodeDefinition) -> Box<dyn NodeImpl> {
-    (self.0)(def)
+  fn new_node(
+    &self,
+    def: &NodeDefinition,
+    data: Option<serde_json::Value>,
+  ) -> Result<Box<dyn NodeImpl>> {
+    (self.0)(def, data)
   }
 }
 
@@ -190,7 +223,10 @@ pub struct NodeDefinition {
 }
 
 impl NodeDefinition {
-  pub fn new(name: &str, create: fn(&NodeDefinition) -> Box<dyn NodeImpl>) -> Self {
+  pub fn new(
+    name: &str,
+    create: fn(&NodeDefinition, Option<serde_json::Value>) -> Result<Box<dyn NodeImpl>>,
+  ) -> Self {
     Self {
       name: name.to_string(),
       uuid: uuid::Uuid::new_v5(&NAMESPACE_NODE_IMPL, name.as_bytes()),
@@ -206,8 +242,12 @@ impl NodeDefinition {
       .contains(&filter.name.to_lowercase())
   }
 
-  pub fn new_node(&self) -> Box<dyn NodeImpl> {
-    self.builder.new_node(self)
+  pub fn new_node(&self) -> Result<Box<dyn NodeImpl>> {
+    self.builder.new_node(self, None)
+  }
+
+  pub fn load_node(&self, data: serde_json::Value) -> Result<Box<dyn NodeImpl>> {
+    self.builder.new_node(self, Some(data))
   }
 
   pub fn parameters(&self) -> impl Iterator<Item = (&String, &ParameterDefinition)> {
