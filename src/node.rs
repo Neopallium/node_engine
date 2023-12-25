@@ -192,16 +192,6 @@ pub trait NodeInterface: NodeImpl {
   fn set_input<I: Into<InputKey>>(&mut self, idx: I, value: Input) -> Result<Option<OutputId>>;
 }
 
-impl dyn NodeImpl {
-  pub fn get_input<I: Into<InputKey>>(&self, idx: I) -> Result<Input> {
-    self.get_node_input(&idx.into())
-  }
-
-  pub fn set_input<I: Into<InputKey>>(&mut self, idx: I, value: Input) -> Result<Option<OutputId>> {
-    self.set_node_input(&idx.into(), value)
-  }
-}
-
 impl<T: ?Sized + NodeImpl> NodeInterface for T {
   fn get_input<I: Into<InputKey>>(&self, idx: I) -> Result<Input> {
     self.get_node_input(&idx.into())
@@ -218,28 +208,36 @@ impl Clone for Box<dyn NodeImpl> {
   }
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
-pub struct Node {
-  pub(crate) id: NodeId,
-  name: String,
-  node_type: Uuid,
-  node: Box<dyn NodeImpl>,
-  position: emath::Vec2,
-  size: emath::Vec2,
-  #[serde(skip)]
-  updated: bool,
-  #[serde(skip)]
-  selected: bool,
-}
-
 #[derive(serde::Deserialize)]
 pub struct LoadNodeState {
   pub id: NodeId,
+  pub group_id: NodeGroupId,
   pub name: String,
   pub node_type: Uuid,
   pub node: serde_json::Value,
-  pub position: emath::Vec2,
-  pub size: emath::Vec2,
+  pub area: emath::Rect,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Node {
+  pub id: NodeId,
+  pub group_id: NodeGroupId,
+  pub name: String,
+  node_type: Uuid,
+  node: Box<dyn NodeImpl>,
+  pub area: emath::Rect,
+  #[serde(skip)]
+  updated: bool,
+  #[serde(skip)]
+  pub selected: bool,
+  #[serde(skip)]
+  frame_state: NodeFrameState,
+}
+
+impl GetId for Node {
+  fn id(&self) -> Uuid {
+    self.id
+  }
 }
 
 impl<'de> Deserialize<'de> for Node {
@@ -258,37 +256,51 @@ impl Node {
   pub fn new(def: &NodeDefinition) -> Result<Self> {
     Ok(Self {
       id: Uuid::new_v4(),
+      group_id: Uuid::nil(),
       name: def.name.clone(),
       node_type: def.uuid,
       node: def.new_node()?,
-      position: [0., 0.].into(),
-      size: [10., 10.].into(),
+      area: emath::Rect::from_min_size([0., 0.].into(), [10., 10.].into()),
       updated: true,
       selected: false,
+      frame_state: Default::default(),
     })
   }
 
   pub fn load(def: &NodeDefinition, data: LoadNodeState) -> Result<Self> {
     Ok(Self {
       id: data.id,
+      group_id: data.group_id,
       name: data.name,
       node_type: data.node_type,
       node: def.load_node(data.node)?,
-      position: data.position,
-      size: data.size,
+      area: data.area,
       updated: true,
       selected: false,
+      frame_state: Default::default(),
     })
   }
 
   pub fn set_position(&mut self, position: emath::Vec2) {
-    self.position = position;
+    self.area = emath::Rect::from_min_size(position.to_pos2(), self.area.size());
+  }
+
+  pub fn set_size(&mut self, size: emath::Vec2) {
+    self.area = emath::Rect::from_min_size(self.area.min, size);
+  }
+
+  pub fn get_rect(&self) -> emath::Rect {
+    self.area
+  }
+
+  pub(crate) fn new_id(&mut self) {
+    self.id = Uuid::new_v4();
   }
 
   /// Clone node with a new uuid.
   pub fn duplicate(&self) -> Self {
     let mut node = self.clone();
-    node.id = Uuid::new_v4();
+    node.new_id();
     node
   }
 
@@ -329,74 +341,62 @@ impl Node {
 }
 
 #[cfg(feature = "egui")]
-impl Node {
-  fn get_zoomed(&self, zoom: f32) -> (emath::Vec2, emath::Vec2) {
-    let mut position = self.position;
-    let mut size = self.size;
-    position.zoom(zoom);
-    size.zoom(zoom);
-    (position, size)
+impl NodeFrame for Node {
+  fn title(&self) -> &str {
+    &self.name
   }
 
-  pub fn ui_at(&mut self, ui: &mut egui::Ui, offset: egui::Vec2) -> egui::Response {
-    let node_style = ui.node_style();
-    let zoom = node_style.zoom;
-    // Apply zoom to node position and size.
-    let (position, size) = self.get_zoomed(zoom);
-    // Need to translate node to Screen space.
-    let pos = position + offset;
-    let rect = egui::Rect::from_min_size(pos.to_pos2(), size);
+  fn set_title(&mut self, title: String) {
+    self.name = title;
+  }
 
-    // Dragged or clicked.
-    let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
-    if resp.dragged() {
-      self.position = (position + resp.drag_delta()) / zoom;
-      resp.scroll_to_me(None);
-    }
+  fn frame_state(&self) -> &NodeFrameState {
+    &self.frame_state
+  }
+
+  fn frame_state_mut(&mut self) -> &mut NodeFrameState {
+    &mut self.frame_state
+  }
+
+  fn rect(&self) -> emath::Rect {
+    self.area
+  }
+
+  fn set_rect(&mut self, rect: emath::Rect) {
+    self.area = rect;
+  }
+
+  fn auto_size(&self) -> bool {
+    true
+  }
+
+  fn resizable(&self) -> bool {
+    false
+  }
+
+  /// Force draw, even if not visible.
+  fn updated(&self) -> bool {
+    self.updated
+  }
+
+  /// Force draw, even if not visible.
+  fn selected(&self) -> bool {
+    self.selected
+  }
+
+  /// Handle other events.
+  fn handle_resp(&mut self, _ui: &egui::Ui, resp: &egui::Response) {
     if resp.clicked() {
       self.selected = !self.selected;
     }
-
-    // Only render this node if it is visible or the node was updated.
-    if !self.updated && !ui.is_rect_visible(rect) {
-      // This is needed to stabilize Ui ids when nodes become visible.
-      ui.skip_ahead_auto_ids(1);
-      return resp;
-    }
-    self.updated = false;
-
-    let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.id);
-    self.frame_ui(&mut child_ui, node_style);
-
-    // Update node size.
-    let rect = child_ui.min_rect();
-    self.size = rect.size() / zoom;
-    resp
   }
 
-  fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {
-    // Window-style frame.
-    let style = ui.style();
-    let mut frame = egui::Frame::window(style);
-    frame.shadow = Default::default();
-    if self.selected {
-      frame.stroke.color = egui::Color32::WHITE;
-    }
-
-    frame.fill(egui::Color32::from_gray(50)).show(ui, |ui| {
-      ui.vertical(|ui| {
-        // Title bar.
-        ui.horizontal(|ui| {
-          ui.label(&self.name);
-        });
-        // Contents
-        egui::Frame::none()
-          .fill(egui::Color32::from_gray(63))
-          .show(ui, |ui| {
-            ui.set_min_width(node_style.node_min_size.x);
-            self.node.ui(ui, self.id);
-          });
+  fn contents_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {
+    egui::Frame::none()
+      .fill(egui::Color32::from_gray(63))
+      .show(ui, |ui| {
+        ui.set_min_width(node_style.node_min_size.x);
+        self.node.ui(ui, self.id);
       });
-    });
   }
 }

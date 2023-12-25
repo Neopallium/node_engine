@@ -2,7 +2,7 @@
 use egui::{
   epaint::Shadow,
   style::{Interaction, Spacing, WidgetVisuals, Widgets},
-  FontId, Margin, Rounding, Stroke, Style, Vec2, Visuals,
+  FontId, Margin, Rounding, Stroke, Style, Visuals,
 };
 
 pub trait Zoom {
@@ -16,10 +16,26 @@ impl Zoom for f32 {
   }
 }
 
-impl Zoom for Vec2 {
+impl Zoom for emath::Vec2 {
   #[inline(always)]
   fn zoom(&mut self, zoom: f32) {
     *self *= zoom;
+  }
+}
+
+impl Zoom for emath::Pos2 {
+  #[inline(always)]
+  fn zoom(&mut self, zoom: f32) {
+    self.x *= zoom;
+    self.y *= zoom;
+  }
+}
+
+impl Zoom for emath::Rect {
+  #[inline(always)]
+  fn zoom(&mut self, zoom: f32) {
+    self.min.zoom(zoom);
+    self.max.zoom(zoom);
   }
 }
 

@@ -10,6 +10,76 @@ use anyhow::{anyhow, Result};
 use crate::ui::*;
 use crate::*;
 
+pub type NodeGroupId = Uuid;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NodeGroup {
+  id: NodeGroupId,
+  title: String,
+  area: emath::Rect,
+  #[serde(skip)]
+  updated: bool,
+  #[serde(skip)]
+  frame_state: NodeFrameState,
+}
+
+impl NodeGroup {
+  pub fn new() -> Self {
+    Self {
+      id: Uuid::new_v4(),
+      title: "".to_string(),
+      area: emath::Rect::from_min_size([0., 0.].into(), [10., 10.].into()),
+      updated: true,
+      frame_state: Default::default(),
+    }
+  }
+
+  pub fn add_node(&mut self, node: &mut Node) {
+    node.group_id = node.id;
+    self.area = self.area.union(node.get_rect());
+  }
+}
+
+#[cfg(feature = "egui")]
+impl NodeFrame for NodeGroup {
+  fn title(&self) -> &str {
+    &self.title
+  }
+
+  fn set_title(&mut self, title: String) {
+    self.title = title;
+  }
+
+  fn frame_state(&self) -> &NodeFrameState {
+    &self.frame_state
+  }
+
+  fn frame_state_mut(&mut self) -> &mut NodeFrameState {
+    &mut self.frame_state
+  }
+
+  fn rect(&self) -> emath::Rect {
+    self.area
+  }
+
+  fn set_rect(&mut self, rect: emath::Rect) {
+    self.area = rect;
+  }
+
+  /// Force draw, even if not visible.
+  fn updated(&self) -> bool {
+    self.updated
+  }
+
+  /// Frame style
+  fn frame_style(&self) -> NodeFrameStyle {
+    NodeFrameStyle {
+      fill: egui::Color32::from_gray(10),
+      ..Default::default()
+    }
+  }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EditorState {
   size: emath::Vec2,
@@ -47,10 +117,29 @@ impl EditorState {
   }
 }
 
-#[derive(Clone, Default, Debug)]
-struct NodeMap(pub(crate) IndexMap<NodeId, Node>);
+pub trait GetId {
+  fn id(&self) -> Uuid;
+}
 
-impl Serialize for NodeMap {
+impl GetId for NodeGroup {
+  fn id(&self) -> Uuid {
+    self.id
+  }
+}
+
+#[derive(Clone, Debug)]
+struct IdMap<V>(pub(crate) IndexMap<Uuid, V>);
+
+impl<V> Default for IdMap<V> {
+  fn default() -> Self {
+    Self(Default::default())
+  }
+}
+
+impl<V> Serialize for IdMap<V>
+where
+  V: Serialize
+{
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
     S: Serializer,
@@ -63,13 +152,16 @@ impl Serialize for NodeMap {
   }
 }
 
-impl<'de> Deserialize<'de> for NodeMap {
+impl<'de, V> Deserialize<'de> for IdMap<V>
+where
+  V: GetId + serde::de::DeserializeOwned
+{
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
   where
     D: Deserializer<'de>,
   {
-    let nodes = Vec::<Node>::deserialize(deserializer)?;
-    Ok(Self(nodes.into_iter().map(|n| (n.id, n)).collect()))
+    let nodes = Vec::<V>::deserialize(deserializer)?;
+    Ok(Self(nodes.into_iter().map(|n| (n.id(), n)).collect()))
   }
 }
 
@@ -117,7 +209,8 @@ impl<'de> Deserialize<'de> for ConnectionMap {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
   editor: EditorState,
-  nodes: NodeMap,
+  nodes: IdMap<Node>,
+  groups: IdMap<NodeGroup>,
   connections: ConnectionMap,
   output: Option<NodeId>,
 }
@@ -127,12 +220,42 @@ impl NodeGraph {
     Self::default()
   }
 
+  pub fn group_selected_nodes(&mut self) -> Option<NodeGroupId> {
+    let mut group = NodeGroup::new();
+
+    //let mut area = None;
+    let mut empty = true;
+    for (_, node) in &mut self.nodes.0 {
+      if node.selected {
+        empty = false;
+        group.add_node(node);
+      }
+    }
+
+    if empty {
+      None
+    } else {
+      group.area = group.area.expand(50.0);
+      Some(self.add_group(group))
+    }
+  }
+
+  pub fn add_group(&mut self, mut group: NodeGroup) -> NodeGroupId {
+    // Check for duplicate node group ids.
+    if self.contains(group.id) {
+      group.id = Uuid::new_v4();
+    }
+    let id = group.id;
+    self.groups.0.insert(id, group);
+    id
+  }
+
   pub fn add(&mut self, mut node: Node) -> NodeId {
     // Check for duplicate node ids.
-    if self.contains(node.id) {
-      node.id = Uuid::new_v4();
+    if self.contains(node.id()) {
+      node.new_id();
     }
-    let id = node.id;
+    let id = node.id();
     self.nodes.0.insert(id, node);
     id
   }
@@ -283,7 +406,7 @@ impl NodeGraph {
       // Set node graph area.
       ui.set_width(size.x);
       ui.set_height(size.y);
-      // Need UI screen-space `min` to covert Node Graph positions to screen-space.
+      // Need UI screen-space `min` to covert from graph-space to screen-space.
       let ui_min = ui.min_rect().min.to_vec2();
       let origin = origin + ui_min;
       ui.set_node_graph_meta(NodeGraphMeta { ui_min, zoom });
@@ -295,10 +418,15 @@ impl NodeGraph {
         }
       }
 
+      // Render groups.
+      for (_id, group) in &mut self.groups.0 {
+        group.render(ui, origin);
+      }
+
       // Render nodes.
       let mut remove_node = None;
       for (node_id, node) in &mut self.nodes.0 {
-        node.ui_at(ui, origin).context_menu(|ui| {
+        node.render(ui, origin).context_menu(|ui| {
           if ui.button("Delete").clicked() {
             remove_node = Some(*node_id);
             ui.close_menu();
@@ -430,7 +558,11 @@ impl NodeGraphEditor {
           if self.next_position.is_none() {
             self.next_position = Some(self.graph.editor.current_pos);
           }
-          // Node filter UI first.
+          if ui.button("Group Nodes").clicked() {
+            self.graph.group_selected_nodes();
+            ui.close_menu();
+          }
+          // Node filter UI.
           self.node_filter.ui(ui);
           if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
             if let Some(position) = self.next_position.take() {

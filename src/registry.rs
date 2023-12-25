@@ -39,7 +39,7 @@ impl NodeFilter {
   #[cfg(feature = "egui")]
   pub fn ui(&mut self, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-      ui.add(egui::TextEdit::singleline(&mut self.name).hint_text("Filter nodes"))
+      ui.add(egui::TextEdit::singleline(&mut self.name).hint_text("🔍 Search"))
         .request_focus();
     });
   }
