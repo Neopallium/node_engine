@@ -6,7 +6,7 @@ const X_OFFSET: f32 = 250.0;
 const Y_OFFSET: f32 = 50.0;
 
 fn build_sub_graph(
-  node: &NodeState,
+  node: &Node,
   graph: &mut NodeGraph,
   position: emath::Vec2,
   depth: usize,
@@ -23,7 +23,7 @@ fn build_sub_graph(
     (0, Input::from(Vec4::ONE), Input::from(Vec4::ONE))
   };
   let mut node = node.duplicate();
-  node.position = position;
+  node.set_position(position);
   let id = graph.add(node);
   graph.set_node_input(id, "A", a)?;
   graph.set_node_input(id, "B", b)?;
@@ -41,7 +41,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
   let mut frag = reg
     .new_by_name("Fragment output")
     .expect("Fragment output node");
-  frag.position = position;
+  frag.set_position(position);
   let output_id = graph.add(frag);
   graph.set_node_input(output_id, "Color", Input::from(id))?;
   graph.set_output(Some(output_id));

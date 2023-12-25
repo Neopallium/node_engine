@@ -219,7 +219,7 @@ impl Clone for Box<dyn NodeImpl> {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
-pub struct NodeState {
+pub struct Node {
   pub(crate) id: NodeId,
   name: String,
   node_type: Uuid,
@@ -242,7 +242,7 @@ pub struct LoadNodeState {
   pub size: emath::Vec2,
 }
 
-impl<'de> Deserialize<'de> for NodeState {
+impl<'de> Deserialize<'de> for Node {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
   where
     D: Deserializer<'de>,
@@ -254,7 +254,7 @@ impl<'de> Deserialize<'de> for NodeState {
   }
 }
 
-impl NodeState {
+impl Node {
   pub fn new(def: &NodeDefinition) -> Result<Self> {
     Ok(Self {
       id: Uuid::new_v4(),
@@ -329,7 +329,7 @@ impl NodeState {
 }
 
 #[cfg(feature = "egui")]
-impl NodeState {
+impl Node {
   fn get_zoomed(&self, zoom: f32) -> (emath::Vec2, emath::Vec2) {
     let mut position = self.position;
     let mut size = self.size;

@@ -20,7 +20,7 @@ const X_OFFSET: f32 = 400.0;
 const Y_OFFSET: f32 = 50.0;
 
 fn build_sub_graph(
-  node: &NodeState,
+  node: &Node,
   graph: &mut NodeGraph,
   position: emath::Vec2,
   depth: usize,

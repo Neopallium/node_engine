@@ -48,7 +48,7 @@ impl EditorState {
 }
 
 #[derive(Clone, Default, Debug)]
-struct NodeMap(pub(crate) IndexMap<NodeId, NodeState>);
+struct NodeMap(pub(crate) IndexMap<NodeId, Node>);
 
 impl Serialize for NodeMap {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -68,7 +68,7 @@ impl<'de> Deserialize<'de> for NodeMap {
   where
     D: Deserializer<'de>,
   {
-    let nodes = Vec::<NodeState>::deserialize(deserializer)?;
+    let nodes = Vec::<Node>::deserialize(deserializer)?;
     Ok(Self(nodes.into_iter().map(|n| (n.id, n)).collect()))
   }
 }
@@ -127,7 +127,7 @@ impl NodeGraph {
     Self::default()
   }
 
-  pub fn add(&mut self, mut node: NodeState) -> NodeId {
+  pub fn add(&mut self, mut node: Node) -> NodeId {
     // Check for duplicate node ids.
     if self.contains(node.id) {
       node.id = Uuid::new_v4();
@@ -137,7 +137,7 @@ impl NodeGraph {
     id
   }
 
-  pub fn remove(&mut self, id: NodeId) -> Option<NodeState> {
+  pub fn remove(&mut self, id: NodeId) -> Option<Node> {
     // Remove all connections to the node.
     self.connections.0.retain(|input, output| {
       if output.node() == id {
@@ -217,7 +217,7 @@ impl NodeGraph {
     Ok(())
   }
 
-  pub fn get(&self, id: NodeId) -> Result<&NodeState> {
+  pub fn get(&self, id: NodeId) -> Result<&Node> {
     self
       .nodes
       .0
@@ -225,7 +225,7 @@ impl NodeGraph {
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))
   }
 
-  pub fn get_mut(&mut self, id: NodeId) -> Result<&mut NodeState> {
+  pub fn get_mut(&mut self, id: NodeId) -> Result<&mut Node> {
     self
       .nodes
       .0

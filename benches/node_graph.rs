@@ -21,7 +21,7 @@ fn bench_graph_dynamic_eval(c: &mut Criterion, graphes: &[(usize, NodeGraph, f32
 }
 
 fn build_sub_graph(
-  node: &NodeState,
+  node: &Node,
   graph: &mut NodeGraph,
   depth: usize,
   input: &Input,

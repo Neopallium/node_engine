@@ -747,7 +747,6 @@ mod test {
 
   #[test]
   fn test_impl_node_macro() {
-    let reg = NodeRegistry::new();
     let mut node = TestNode::new();
     node.set_input("Color", Vec2::new(1.0, 2.0).into()).unwrap();
     node.set_input("Scale", 3.14.into()).unwrap();

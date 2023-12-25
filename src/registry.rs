@@ -61,16 +61,16 @@ impl NodeRegistryInner {
     self.nodes.insert(def.uuid, def.clone())
   }
 
-  pub fn load_node(&self, data: LoadNodeState) -> Result<NodeState> {
+  pub fn load_node(&self, data: LoadNodeState) -> Result<Node> {
     let id = data.node_type;
     let def = self
       .nodes
       .get(&id)
       .ok_or_else(|| anyhow!("Missing Node definition: {id:?}"))?;
-    NodeState::load(def, data)
+    Node::load(def, data)
   }
 
-  fn new_by_name(&self, name: &str) -> Result<NodeState> {
+  fn new_by_name(&self, name: &str) -> Result<Node> {
     let id = self
       .name_to_id
       .get(name)
@@ -78,22 +78,22 @@ impl NodeRegistryInner {
     self.new_by_id(*id)
   }
 
-  fn new_by_id(&self, id: Uuid) -> Result<NodeState> {
+  fn new_by_id(&self, id: Uuid) -> Result<Node> {
     let def = self
       .nodes
       .get(&id)
       .ok_or_else(|| anyhow!("Missing Node definition: {id:?}"))?;
-    NodeState::new(def)
+    Node::new(def)
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<NodeState> {
+  pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<Node> {
     let mut selected_node = None;
     ui.group(|ui| {
       for def in self.nodes.values() {
         if def.matches(filter) {
           if ui.button(&def.name).clicked() {
-            selected_node = Some(NodeState::new(def).expect("Node building shouldn't fail"));
+            selected_node = Some(Node::new(def).expect("Node building shouldn't fail"));
           }
         }
       }
@@ -126,23 +126,23 @@ impl NodeRegistry {
     inner.register(def)
   }
 
-  pub fn load_node(&self, data: LoadNodeState) -> Result<NodeState> {
+  pub fn load_node(&self, data: LoadNodeState) -> Result<Node> {
     let inner = self.0.read().unwrap();
     inner.load_node(data)
   }
 
-  pub fn new_by_id(&self, id: Uuid) -> Result<NodeState> {
+  pub fn new_by_id(&self, id: Uuid) -> Result<Node> {
     let inner = self.0.read().unwrap();
     inner.new_by_id(id)
   }
 
-  pub fn new_by_name(&self, name: &str) -> Result<NodeState> {
+  pub fn new_by_name(&self, name: &str) -> Result<Node> {
     let inner = self.0.read().unwrap();
     inner.new_by_name(name)
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<NodeState> {
+  pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<Node> {
     let inner = self.0.write().unwrap();
     inner.ui(ui, filter)
   }

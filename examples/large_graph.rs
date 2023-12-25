@@ -4,7 +4,7 @@ const X_OFFSET: f32 = 250.0;
 const Y_OFFSET: f32 = 50.0;
 
 fn build_sub_graph(
-  node: &NodeState,
+  node: &Node,
   graph: &mut NodeGraph,
   position: emath::Vec2,
   depth: usize,
@@ -21,7 +21,7 @@ fn build_sub_graph(
     (0, Input::from(1.0), Input::from(1.0))
   };
   let mut node = node.duplicate();
-  node.position = position;
+  node.set_position(position);
   let id = graph.add(node);
   graph.set_node_input(id, "A", a)?;
   graph.set_node_input(id, "B", b)?;

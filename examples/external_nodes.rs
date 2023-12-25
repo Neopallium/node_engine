@@ -39,10 +39,8 @@ impl_node! {
 }
 
 fn main() -> anyhow::Result<()> {
-  let reg = build_registry();
   let mut node = CustomNode::new();
   node.set_input("Color", Vec4::new(1.0, 2.0, 3.0, 1.0).into())?;
-  reg.register::<CustomNode>();
 
   Ok(())
 }
