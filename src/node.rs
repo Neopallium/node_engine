@@ -1,11 +1,10 @@
 use core::fmt;
-use std::collections::HashMap;
 
 use uuid::Uuid;
 
 use anyhow::{anyhow, Result};
 
-use serde::{de::Deserializer, ser::SerializeMap, Deserialize, Serialize, Serializer};
+use serde::{de::Deserializer, Deserialize, Serialize, Serializer};
 
 #[cfg(feature = "egui")]
 use crate::ui::*;
@@ -176,45 +175,12 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
   }
 }
 
-struct NodeData<'a, N: ?Sized>(&'a N);
-
-impl<'a, N> Serialize for NodeData<'a, N>
-where
-  N: ?Sized + erased_serde::Serialize + 'a,
-{
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-  where
-    S: Serializer,
-  {
-    erased_serde::serialize(self.0, serializer)
-  }
-}
-
 impl Serialize for dyn NodeImpl {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
     S: Serializer,
   {
-    let mut ser = serializer.serialize_map(Some(1))?;
-    let node_type = self.def().uuid;
-    ser.serialize_entry(&node_type, &NodeData(self))?;
-    ser.end()
-  }
-}
-
-impl<'de> Deserialize<'de> for Box<dyn NodeImpl> {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-  where
-    D: Deserializer<'de>,
-  {
-    let map = HashMap::<Uuid, serde_json::Value>::deserialize(deserializer)?;
-    let (id, node) = map
-      .into_iter()
-      .next()
-      .ok_or_else(|| serde::de::Error::custom("Node missing implementation data"))?;
-    NODE_REGISTRY
-      .load_node(id, node)
-      .map_err(serde::de::Error::custom)
+    erased_serde::serialize(self, serializer)
   }
 }
 
@@ -252,16 +218,40 @@ impl Clone for Box<dyn NodeImpl> {
   }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct NodeState {
   pub(crate) id: NodeId,
   name: String,
+  node_type: Uuid,
   node: Box<dyn NodeImpl>,
   position: emath::Vec2,
   size: emath::Vec2,
   #[serde(skip)]
   updated: bool,
+  #[serde(skip)]
   selected: bool,
+}
+
+#[derive(serde::Deserialize)]
+pub struct LoadNodeState {
+  pub id: NodeId,
+  pub name: String,
+  pub node_type: Uuid,
+  pub node: serde_json::Value,
+  pub position: emath::Vec2,
+  pub size: emath::Vec2,
+}
+
+impl<'de> Deserialize<'de> for NodeState {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    let node = LoadNodeState::deserialize(deserializer)?;
+    NODE_REGISTRY
+      .load_node(node)
+      .map_err(serde::de::Error::custom)
+  }
 }
 
 impl NodeState {
@@ -269,9 +259,23 @@ impl NodeState {
     Ok(Self {
       id: Uuid::new_v4(),
       name: def.name.clone(),
+      node_type: def.uuid,
       node: def.new_node()?,
       position: [0., 0.].into(),
       size: [10., 10.].into(),
+      updated: true,
+      selected: false,
+    })
+  }
+
+  pub fn load(def: &NodeDefinition, data: LoadNodeState) -> Result<Self> {
+    Ok(Self {
+      id: data.id,
+      name: data.name,
+      node_type: data.node_type,
+      node: def.load_node(data.node)?,
+      position: data.position,
+      size: data.size,
       updated: true,
       selected: false,
     })

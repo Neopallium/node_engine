@@ -61,12 +61,13 @@ impl NodeRegistryInner {
     self.nodes.insert(def.uuid, def.clone())
   }
 
-  pub fn load_node(&self, id: Uuid, data: serde_json::Value) -> Result<Box<dyn NodeImpl>> {
+  pub fn load_node(&self, data: LoadNodeState) -> Result<NodeState> {
+    let id = data.node_type;
     let def = self
       .nodes
       .get(&id)
       .ok_or_else(|| anyhow!("Missing Node definition: {id:?}"))?;
-    def.load_node(data)
+    NodeState::load(def, data)
   }
 
   fn new_by_name(&self, name: &str) -> Result<NodeState> {
@@ -125,9 +126,9 @@ impl NodeRegistry {
     inner.register(def)
   }
 
-  pub fn load_node(&self, id: Uuid, data: serde_json::Value) -> Result<Box<dyn NodeImpl>> {
+  pub fn load_node(&self, data: LoadNodeState) -> Result<NodeState> {
     let inner = self.0.read().unwrap();
-    inner.load_node(id, data)
+    inner.load_node(data)
   }
 
   pub fn new_by_id(&self, id: Uuid) -> Result<NodeState> {
