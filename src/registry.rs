@@ -187,7 +187,7 @@ impl fmt::Debug for Box<dyn NodeBuilder> {
 impl Default for Box<dyn NodeBuilder> {
   fn default() -> Self {
     Box::new(NodeBuilderFn(|def, _| {
-      Ok(Box::new(EditOnlyNode::new(def.clone())))
+      Err(anyhow!("Missing code for Node definition: {def:?}"))
     }))
   }
 }
