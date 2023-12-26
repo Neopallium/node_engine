@@ -10,7 +10,10 @@ repository = "https://github.com/Neopallium/node_engine"
 homepage = "https://github.com/Neopallium/node_engine"
 
 [features]
-default = ["egui"]
+default = ["egui", "math_nodes", "shader_nodes"]
+
+math_nodes = []
+shader_nodes = []
 
 [dependencies]
 anyhow = "1.0"
