@@ -111,18 +111,21 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
     let output_count = def.outputs.len();
     let node_style = ui.node_style();
     let zoom = node_style.zoom;
-    ui.horizontal(|ui| {
-      if input_count > 0 {
-        ui.vertical(|ui| {
-          self.inputs_ui(ui, id);
-        });
-      }
-      if output_count > 0 {
-        ui.vertical(|ui| {
-          ui.set_min_width(50.0 * zoom);
-          self.outputs_ui(ui, id);
-        });
-      }
+    ui.vertical(|ui| {
+      ui.horizontal(|ui| {
+        if input_count > 0 {
+          ui.vertical(|ui| {
+            self.inputs_ui(ui, id);
+          });
+        }
+        if output_count > 0 {
+          ui.vertical(|ui| {
+            ui.set_min_width(50.0 * zoom);
+            self.outputs_ui(ui, id);
+          });
+        }
+      });
+      self.parameters_ui(ui, id);
     });
   }
 
@@ -155,6 +158,31 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
     if let Some((input_key, value)) = input_changed {
       if let Err(err) = self.set_node_input(&input_key, value.into()) {
         log::error!("Failed to update node input: {err:?}");
+      }
+    }
+  }
+
+  #[cfg(feature = "egui")]
+  fn parameters_ui(&mut self, ui: &mut egui::Ui, _id: NodeId) {
+    let mut parameter_changed = None;
+    for (name, def) in &self.def().parameters {
+      ui.horizontal(|ui| {
+        let mut value = match self.get_param(name) {
+          Ok(val) => val,
+          Err(err) => {
+            ui.label(format!("Invalid parameter: {err:?}"));
+            return;
+          }
+        };
+        ui.label(format!("{}", name));
+        if def.ui(ui, &mut value) {
+          parameter_changed = Some((name.to_string(), value));
+        }
+      });
+    }
+    if let Some((name, value)) = parameter_changed {
+      if let Err(err) = self.set_param(&name, value.into()) {
+        log::error!("Failed to update node parameter: {err:?}");
       }
     }
   }

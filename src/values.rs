@@ -339,6 +339,35 @@ impl ParameterDefinition {
       )),
     }
   }
+
+  #[cfg(feature = "egui")]
+  pub fn ui(&self, ui: &mut egui::Ui, value: &mut ParameterValue) -> bool {
+    ui.horizontal(|ui| {
+      match (&self.param_type, value) {
+        (ParameterDataType::Value(_), ParameterValue::Value(value)) => {
+          value.ui(ui).changed()
+        },
+        (ParameterDataType::Select(values), ParameterValue::Selected(selected)) => {
+          let mut changed = false;
+          egui::ComboBox::from_id_source(&self.field_name)
+            .selected_text(selected.as_str())
+            .show_ui(ui, |ui| {
+              for value in values {
+                if ui.selectable_value(selected, value.to_string(), value).changed() {
+                  changed = true;
+                }
+              }
+            }
+          );
+          changed
+        },
+        _ => {
+          ui.label("Invalid node parameter.  The value and definition don't match.");
+          false
+        }
+      }
+    }).inner
+  }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
