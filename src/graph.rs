@@ -18,8 +18,6 @@ pub struct NodeGroup {
   title: String,
   area: emath::Rect,
   #[serde(skip)]
-  updated: bool,
-  #[serde(skip)]
   frame_state: NodeFrameState,
 }
 
@@ -28,15 +26,18 @@ impl NodeGroup {
     Self {
       id: Uuid::new_v4(),
       title: "".to_string(),
-      area: emath::Rect::from_min_size([0., 0.].into(), [10., 10.].into()),
-      updated: true,
+      area: emath::Rect::NOTHING,
       frame_state: Default::default(),
     }
   }
 
   pub fn add_node(&mut self, node: &mut Node) {
-    node.group_id = node.id;
-    self.area = self.area.union(node.get_rect());
+    node.group_id = self.id;
+    self.area = self.area.union(node.rect());
+  }
+
+  pub fn is_dragging(&self) -> bool {
+    Some(NodeFrameDragState::Drag) == self.frame_state().drag
   }
 }
 
@@ -64,11 +65,6 @@ impl NodeFrame for NodeGroup {
 
   fn set_rect(&mut self, rect: emath::Rect) {
     self.area = rect;
-  }
-
-  /// Force draw, even if not visible.
-  fn updated(&self) -> bool {
-    self.updated
   }
 
   /// Frame style
@@ -138,7 +134,7 @@ impl<V> Default for IdMap<V> {
 
 impl<V> Serialize for IdMap<V>
 where
-  V: Serialize
+  V: Serialize,
 {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
@@ -154,7 +150,7 @@ where
 
 impl<'de, V> Deserialize<'de> for IdMap<V>
 where
-  V: GetId + serde::de::DeserializeOwned
+  V: GetId + serde::de::DeserializeOwned,
 {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
   where
@@ -223,10 +219,9 @@ impl NodeGraph {
   pub fn group_selected_nodes(&mut self) -> Option<NodeGroupId> {
     let mut group = NodeGroup::new();
 
-    //let mut area = None;
     let mut empty = true;
     for (_, node) in &mut self.nodes.0 {
-      if node.selected {
+      if node.selected() {
         empty = false;
         group.add_node(node);
       }
@@ -248,6 +243,39 @@ impl NodeGraph {
     let id = group.id;
     self.groups.0.insert(id, group);
     id
+  }
+
+  pub fn remove_group(&mut self, group_id: NodeGroupId, delete_nodes: bool) {
+    self.groups.0.remove(&group_id);
+    if delete_nodes {
+      let mut nodes = Vec::new();
+      for (node_id, node) in &mut self.nodes.0 {
+        if node.group_id == group_id {
+          nodes.push(*node_id);
+        }
+      }
+      for node_id in nodes {
+        self.remove(node_id);
+      }
+    } else {
+      for (_, node) in &mut self.nodes.0 {
+        if node.group_id == group_id {
+          node.group_id = Uuid::nil();
+        }
+      }
+    }
+  }
+
+  pub fn resize_group(&mut self, group_id: NodeGroupId) {
+    if let Some(group) = self.groups.0.get_mut(&group_id) {
+      let mut area = emath::Rect::NOTHING;
+      for (_, node) in &mut self.nodes.0 {
+        if node.group_id == group_id {
+          area = area.union(node.rect());
+        }
+      }
+      group.area = area.expand(50.0);
+    }
   }
 
   pub fn add(&mut self, mut node: Node) -> NodeId {
@@ -419,23 +447,60 @@ impl NodeGraph {
       }
 
       // Render groups.
-      for (_id, group) in &mut self.groups.0 {
-        group.render(ui, origin);
-      }
-
-      // Render nodes.
-      let mut remove_node = None;
-      for (node_id, node) in &mut self.nodes.0 {
-        node.render(ui, origin).context_menu(|ui| {
-          if ui.button("Delete").clicked() {
-            remove_node = Some(*node_id);
+      let mut remove_group = None;
+      for (group_id, group) in &mut self.groups.0 {
+        let resp = group.render(ui, origin);
+        // If the group is being dragged, also drag the node in that group.
+        if resp.dragged() && group.is_dragging() {
+          for (_, node) in &mut self.nodes.0 {
+            if node.group_id == *group_id {
+              node.handle_dragged(&resp, zoom);
+            }
+          }
+        }
+        resp.context_menu(|ui| {
+          if ui.button("Delete group").clicked() {
+            remove_group = Some((*group_id, false));
+            ui.close_menu();
+          }
+          if ui.button("Delete group and nodes").clicked() {
+            remove_group = Some((*group_id, true));
             ui.close_menu();
           }
         });
       }
-      // Handle removing a node.
+      if let Some((group_id, remove_nodes)) = remove_group {
+        self.remove_group(group_id, remove_nodes);
+      }
+
+      // Render nodes.
+      let mut remove_node = None;
+      let mut resize_group = None;
+      for (node_id, node) in &mut self.nodes.0 {
+        let resp = node.render(ui, origin);
+        if resp.dragged() {
+          resize_group = Some(node.group_id);
+        }
+        resp.context_menu(|ui| {
+          if ui.button("Delete").clicked() {
+            remove_node = Some(*node_id);
+            ui.close_menu();
+          }
+          if !node.group_id.is_nil() {
+            if ui.button("Remove from group").clicked() {
+              resize_group = Some(node.group_id);
+              node.group_id = Uuid::nil();
+              ui.close_menu();
+            }
+          }
+        });
+      }
+      // Handle node actions.
       if let Some(node_id) = remove_node {
         self.remove(node_id);
+      }
+      if let Some(group_id) = resize_group {
+        self.resize_group(group_id);
       }
 
       // Handle connecting/disconnecting.
@@ -558,17 +623,19 @@ impl NodeGraphEditor {
           if self.next_position.is_none() {
             self.next_position = Some(self.graph.editor.current_pos);
           }
+          ui.menu_button("Create node", |ui| {
+            // Node filter UI.
+            self.node_filter.ui(ui);
+            if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
+              if let Some(position) = self.next_position.take() {
+                node.set_position(position);
+              }
+              self.graph.add(node);
+              ui.close_menu();
+            }
+          });
           if ui.button("Group Nodes").clicked() {
             self.graph.group_selected_nodes();
-            ui.close_menu();
-          }
-          // Node filter UI.
-          self.node_filter.ui(ui);
-          if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
-            if let Some(position) = self.next_position.take() {
-              node.set_position(position);
-            }
-            self.graph.add(node);
             ui.close_menu();
           }
         });

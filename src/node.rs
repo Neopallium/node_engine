@@ -227,10 +227,6 @@ pub struct Node {
   node: Box<dyn NodeImpl>,
   pub area: emath::Rect,
   #[serde(skip)]
-  updated: bool,
-  #[serde(skip)]
-  pub selected: bool,
-  #[serde(skip)]
   frame_state: NodeFrameState,
 }
 
@@ -261,8 +257,6 @@ impl Node {
       node_type: def.uuid,
       node: def.new_node()?,
       area: emath::Rect::from_min_size([0., 0.].into(), [10., 10.].into()),
-      updated: true,
-      selected: false,
       frame_state: Default::default(),
     })
   }
@@ -275,22 +269,12 @@ impl Node {
       node_type: data.node_type,
       node: def.load_node(data.node)?,
       area: data.area,
-      updated: true,
-      selected: false,
       frame_state: Default::default(),
     })
   }
 
   pub fn set_position(&mut self, position: emath::Vec2) {
     self.area = emath::Rect::from_min_size(position.to_pos2(), self.area.size());
-  }
-
-  pub fn set_size(&mut self, size: emath::Vec2) {
-    self.area = emath::Rect::from_min_size(self.area.min, size);
-  }
-
-  pub fn get_rect(&self) -> emath::Rect {
-    self.area
   }
 
   pub(crate) fn new_id(&mut self) {
@@ -335,7 +319,7 @@ impl Node {
   }
 
   pub fn set_input<I: Into<InputKey>>(&mut self, idx: I, value: Input) -> Result<Option<OutputId>> {
-    self.updated = true;
+    self.frame_state.updated = true;
     self.node.set_node_input(&idx.into(), value)
   }
 }
@@ -372,23 +356,6 @@ impl NodeFrame for Node {
 
   fn resizable(&self) -> bool {
     false
-  }
-
-  /// Force draw, even if not visible.
-  fn updated(&self) -> bool {
-    self.updated
-  }
-
-  /// Force draw, even if not visible.
-  fn selected(&self) -> bool {
-    self.selected
-  }
-
-  /// Handle other events.
-  fn handle_resp(&mut self, _ui: &egui::Ui, resp: &egui::Response) {
-    if resp.clicked() {
-      self.selected = !self.selected;
-    }
   }
 
   fn contents_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {

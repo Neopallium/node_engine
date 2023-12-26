@@ -17,19 +17,32 @@ impl Default for NodeFrameStyle {
   }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct NodeFrameState {
-  edit_title: bool,
-  drag: Option<NodeFrameDragState>,
+  pub updated: bool,
+  pub selected: bool,
+  pub edit_title: bool,
+  pub drag: Option<NodeFrameDragState>,
 }
 
-#[derive(Clone, Debug)]
+impl Default for NodeFrameState {
+  fn default() -> Self {
+    Self {
+      updated: true,
+      selected: false,
+      edit_title: false,
+      drag: None,
+    }
+  }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NodeFrameDragState {
   Drag,
   Resize(ResizeState),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResizeState {
   top: bool,
   right: bool,
@@ -104,12 +117,12 @@ pub trait NodeFrame: GetId {
 
   /// Force draw, even if not visible.
   fn updated(&self) -> bool {
-    false
+    self.frame_state().updated
   }
 
   /// Frame is selected.
   fn selected(&self) -> bool {
-    false
+    self.frame_state().selected
   }
 
   /// Handle drag events from other UI responses.
@@ -122,8 +135,7 @@ pub trait NodeFrame: GetId {
   }
 
   /// Handle other events.
-  fn handle_resp(&mut self, _ui: &egui::Ui, _resp: &egui::Response) {
-  }
+  fn handle_resp(&mut self, _ui: &egui::Ui, _resp: &egui::Response) {}
 
   /// Render the node.
   fn render(&mut self, ui: &mut egui::Ui, offset: egui::Vec2) -> egui::Response {
@@ -131,6 +143,10 @@ pub trait NodeFrame: GetId {
     let zoom = node_style.zoom;
     // Zoom and translate frame to Screen space.
     let mut rect = self.rect();
+    if self.updated() && self.auto_size() {
+      // Recalculate size.
+      rect.set_width(10.);
+    }
     rect.zoom(zoom);
     rect = rect.translate(offset);
 
@@ -139,7 +155,7 @@ pub trait NodeFrame: GetId {
     let ui = &mut child_ui;
 
     // Allocate a response for the whole frame area.
-    let mut resp = ui.interact(rect, ui.id(), egui::Sense::click_and_drag());
+    let resp = ui.interact(rect, ui.id(), egui::Sense::click_and_drag());
 
     // Only render this frame if it is visible or the frame was updated.
     if !self.updated() && !ui.is_rect_visible(rect) {
@@ -147,12 +163,16 @@ pub trait NodeFrame: GetId {
       ui.skip_ahead_auto_ids(1);
       return resp;
     }
+    self.frame_state_mut().updated = false;
 
     // Render frame UI.
-    resp |= self.frame_ui(ui, node_style);
+    self.frame_ui(ui, node_style);
 
     // Handle events.
-    if resp.dragged() {
+    if resp.clicked() {
+      let state = self.frame_state_mut();
+      state.selected = !state.selected;
+    } else if resp.dragged() {
       match self.frame_state().drag.clone() {
         Some(NodeFrameDragState::Drag) => {
           self.handle_dragged(&resp, zoom);
@@ -207,7 +227,10 @@ pub trait NodeFrame: GetId {
             }
             // Handle resize.
             let state = ResizeState {
-              top, right, bottom, left
+              top,
+              right,
+              bottom,
+              left,
             };
             state.set_cursor(ui);
             self.frame_state_mut().drag = Some(NodeFrameDragState::Resize(state));
@@ -225,7 +248,7 @@ pub trait NodeFrame: GetId {
   }
 
   /// Draw the node's frame.
-  fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) -> egui::Response {
+  fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {
     // Window-style frame.
     let style = ui.style();
     let frame_style = self.frame_style();
@@ -234,9 +257,6 @@ pub trait NodeFrame: GetId {
     if self.selected() {
       frame.stroke.color = frame_style.selected;
     }
-
-    let sense = egui::Sense::click_and_drag();
-    let mut frame_resp = ui.interact(ui.available_rect_before_wrap(), ui.id(), sense);
 
     frame.fill(frame_style.fill).show(ui, |ui| {
       ui.vertical(|ui| {
@@ -254,22 +274,23 @@ pub trait NodeFrame: GetId {
             }
             resp.request_focus();
           } else {
-            // Click title to edit it.
-            let mut resp = ui.add(egui::Label::new(self.title()).sense(sense));
-            // Sense clicks on the whole title bar.
-            resp |= ui.interact(ui.available_rect_before_wrap(), ui.id(), sense);
-            if resp.clicked() {
-              self.frame_state_mut().edit_title = true;
+            let rect = ui.available_rect_before_wrap();
+            ui.label(self.title());
+            // Manually detect click.  To fix issue with context menu.
+            if ui.rect_contains_pointer(rect) {
+              if ui.input(|i| {
+                i.pointer
+                  .button_double_clicked(egui::PointerButton::Primary)
+              }) {
+                self.frame_state_mut().edit_title = true;
+              }
             }
-            // Pass other events to frame (dragged).
-            frame_resp |= resp;
           }
         });
         // Contents
         self.contents_ui(ui, node_style);
       });
     });
-    frame_resp
   }
 
   fn contents_ui(&mut self, ui: &mut egui::Ui, _node_style: NodeStyle) {

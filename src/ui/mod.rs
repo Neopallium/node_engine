@@ -4,8 +4,8 @@ use crate::node::{InputId, NodeId, OutputId};
 
 mod frame;
 mod zoom;
-pub use zoom::*;
 pub use frame::*;
+pub use zoom::*;
 
 const NODE_STYLE: &'static str = "NodeStyle";
 const NODE_GRAPH_META: &'static str = "NodeGraphMeta";
