@@ -69,7 +69,7 @@ fn build_graph(
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-  let reg = build_registry();
+  let reg = NodeRegistry::build();
   let graphes: Vec<_> = [
     (6, false),
     (8, false),

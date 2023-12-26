@@ -50,7 +50,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
 }
 
 fn main() -> anyhow::Result<()> {
-  let reg = build_registry();
+  let reg = NodeRegistry::build();
   eprintln!("Build shader graph");
   let (size, graph) = build_graph(&reg, 3)?;
   eprintln!("Graph size: {size}");

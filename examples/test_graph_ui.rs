@@ -1,5 +1,6 @@
 use glam::Vec4;
 
+use node_engine::ui::*;
 use node_engine::*;
 
 fn main() {
@@ -37,6 +38,7 @@ fn build_sub_graph(
     (0, Input::from(Vec4::ONE), Input::from(Vec4::ONE))
   };
   let mut node = node.duplicate();
+  node.frame_state_mut().selected = true;
   node.set_position(position);
   let id = graph.add(node);
   graph.set_node_input(id, "A", a)?;
@@ -60,6 +62,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
   graph.set_node_input(output_id, "Color", Input::from(id))?;
   graph.set_output(Some(output_id));
 
+  graph.group_selected_nodes();
   Ok((size, graph))
 }
 
@@ -70,7 +73,7 @@ struct MyEguiApp {
 
 impl MyEguiApp {
   fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-    let reg = build_registry();
+    let reg = NodeRegistry::build();
     eprintln!("Build shader graph");
     let (_size, graph) = build_graph(&reg, 2).expect("built graph");
     let mut editor = NodeGraphEditor::new();

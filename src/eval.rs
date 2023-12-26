@@ -68,12 +68,12 @@ impl NodeGraphExecution {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::build_registry;
+  use crate::NodeRegistry;
 
   #[test]
   fn compile_graph() -> Result<()> {
     println!("Build node registry");
-    let reg = build_registry();
+    let reg = NodeRegistry::build();
     println!("Build node graph");
     let mut graph = NodeGraph::new();
     let scalar = reg.new_by_name("Scalar Math").expect("Scalar Math node");

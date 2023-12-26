@@ -593,7 +593,7 @@ impl Default for NodeGraphEditor {
     Self {
       size: (900., 500.).into(),
       graph: Default::default(),
-      registry: build_registry(),
+      registry: NodeRegistry::build(),
       node_filter: Default::default(),
       next_position: None,
     }

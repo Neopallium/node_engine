@@ -42,7 +42,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
 }
 
 fn main() -> anyhow::Result<()> {
-  let reg = build_registry();
+  let reg = NodeRegistry::build();
   let (size, graph, expected) = build_graph(&reg, 20)?;
   eprintln!("Graph size: {size}");
 
