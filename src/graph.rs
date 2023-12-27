@@ -220,14 +220,19 @@ impl NodeGraph {
   }
 
   pub fn take_selected(&mut self) -> Vec<NodeId> {
-    self.nodes.0.iter_mut().filter_map(|(id, node)| {
-      if node.selected() {
-        node.set_selected(false);
-        Some(*id)
-      } else {
-        None
-      }
-    }).collect()
+    self
+      .nodes
+      .0
+      .iter_mut()
+      .filter_map(|(id, node)| {
+        if node.selected() {
+          node.set_selected(false);
+          Some(*id)
+        } else {
+          None
+        }
+      })
+      .collect()
   }
 
   pub fn clear_selected(&mut self) {
@@ -485,7 +490,6 @@ impl NodeGraph {
       if ui.ui_contains_pointer() {
         if let Some(pos) = ui.ctx().pointer_latest_pos() {
           self.editor.current_pos = (pos - origin).to_vec2() / zoom;
-
         }
       }
       // When not scrolling, detect click and drag to select nodes.
@@ -699,10 +703,7 @@ impl NodeGraphEditor {
         egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
           ui.label("TODO: Node finder here");
         });
-        let out = egui::CentralPanel::default()
-          .show_inside(ui, |ui| {
-            self.graph.ui(ui)
-          });
+        let out = egui::CentralPanel::default().show_inside(ui, |ui| self.graph.ui(ui));
         if let Some(resp) = out.inner {
           // Graph menu.
           resp.context_menu(|ui| {
