@@ -145,7 +145,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
         let input_key = InputKey::from(idx);
         let (connected, value) = match self.get_node_input(&input_key) {
           Ok(Input::Value(val)) => (false, Some(val)),
-          Ok(Input::Connect(_)) => (true, None),
+          Ok(Input::Connect(_, _)) => (true, None),
           Ok(Input::Disconnect) => (false, None),
           Err(err) => {
             ui.label(format!("Invalid input: {err:?}"));

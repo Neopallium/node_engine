@@ -84,7 +84,11 @@ impl DataType {
       // Same class is compatible.
       true
     } else {
-      false
+      match (self.class(), other.class()) {
+        (DataTypeClass::Scalar, DataTypeClass::Vector)
+        | (DataTypeClass::Vector, DataTypeClass::Scalar) => true,
+        _ => false,
+      }
     }
   }
 }
@@ -245,7 +249,7 @@ impl InputDefinition {
           ));
         }
       }
-      Input::Connect(_) => (),
+      Input::Connect(_, _) => (),
     }
     Ok(())
   }
@@ -490,7 +494,7 @@ impl From<&str> for InputKey {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Input {
   Disconnect,
-  Connect(OutputId),
+  Connect(OutputId, Option<DataType>),
   Value(Value),
 }
 
@@ -502,7 +506,7 @@ impl<T: Into<Value>> From<T> for Input {
 
 impl From<NodeId> for Input {
   fn from(n: NodeId) -> Self {
-    Self::Connect(OutputId::new(n, 0))
+    Self::Connect(OutputId::new(n, 0), None)
   }
 }
 
@@ -539,7 +543,7 @@ impl<T: ValueType> InputTyped<T> {
 
   pub fn as_input(&self) -> Input {
     match &self.connected {
-      Some(id) => Input::Connect(*id),
+      Some(id) => Input::Connect(*id, Some(T::data_type())),
       None => Input::Value(self.value.to_value()),
     }
   }
@@ -565,7 +569,12 @@ impl<T: ValueType> InputTyped<T> {
       Input::Value(val) => {
         self.value = T::from_value(val)?;
       }
-      Input::Connect(id) => {
+      Input::Connect(id, dt) => {
+        if let Some(output_dt) = dt {
+          if !T::data_type().is_compatible(&output_dt) {
+            return Err(anyhow!("Incompatible output"));
+          }
+        }
         self.connected = Some(id);
       }
     }

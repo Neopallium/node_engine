@@ -365,17 +365,19 @@ impl NodeGraph {
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))?;
     // Convert Input key to id.
     let input_id = node.get_input_idx(&key).map(|idx| InputId::new(id, idx))?;
+    // Set the node input.
+    let old = node.set_input(key, value.clone())?;
+    // Update connections.
     match &value {
       Input::Disconnect => {
         self.connections.0.remove(&input_id);
       }
-      Input::Connect(output_id) => {
+      Input::Connect(output_id, _) => {
         self.connections.0.insert(input_id, *output_id);
       }
       _ => {}
     }
-    // Set the node input.
-    Ok(node.set_input(key, value)?)
+    Ok(old)
   }
 
   pub fn set_input(&mut self, input_id: InputId, value: Input) -> Result<Option<OutputId>> {
@@ -387,8 +389,8 @@ impl NodeGraph {
     Ok(())
   }
 
-  pub fn connect(&mut self, input: InputId, output: OutputId) -> Result<()> {
-    self.set_input(input, Input::Connect(output))?;
+  pub fn connect(&mut self, input: InputId, output: OutputId, dt: DataType) -> Result<()> {
+    self.set_input(input, Input::Connect(output, Some(dt)))?;
     Ok(())
   }
 
@@ -592,9 +594,9 @@ impl NodeGraph {
         if let Some((src, dst)) = ui.get_dropped_node_sockets() {
           // Make sure the input is first and that the sockets are compatible.
           if let Some((src, dst)) = src.input_id_first(dst) {
-            if let Some(dst) = dst {
+            if let Some((dst, dt)) = dst {
               // Connect.
-              if let Err(err) = self.connect(src, dst) {
+              if let Err(err) = self.connect(src, dst, dt) {
                 log::warn!("Failed to connect input[{src:?}] to output[{dst:?}]: {err:?}");
               }
             } else {

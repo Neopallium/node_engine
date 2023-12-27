@@ -278,42 +278,24 @@ impl NodeSocketId {
     }
   }
 
-  pub fn input_first(&self, dst: Option<NodeSocketId>) -> Option<(Self, Option<Self>)> {
-    match (*self, dst) {
-      // Disconect input.
-      (Self::Input(_, _, _), None) => Some((*self, None)),
-      // Connect input to output.
-      (Self::Input(g_in, input, _), Some(Self::Output(g_out, output, _)))
-        if g_in == g_out && input.node != output.node =>
-      {
-        Some((*self, dst))
-      }
-      // Connect output to input.
-      (Self::Output(g_out, output, _), Some(Self::Input(g_in, input, _)))
-        if g_in == g_out && input.node != output.node =>
-      {
-        Some((dst.unwrap(), Some(*self)))
-      }
-      // Other non-compatible connections.
-      _ => None,
-    }
-  }
-
-  pub fn input_id_first(&self, dst: Option<NodeSocketId>) -> Option<(InputId, Option<OutputId>)> {
+  pub fn input_id_first(
+    &self,
+    dst: Option<NodeSocketId>,
+  ) -> Option<(InputId, Option<(OutputId, DataType)>)> {
     match (*self, dst) {
       // Disconect input.
       (Self::Input(_, id, _), None) => Some((id, None)),
       // Connect input to output.
-      (Self::Input(g_in, input, _), Some(Self::Output(g_out, output, _)))
+      (Self::Input(g_in, input, _), Some(Self::Output(g_out, output, dt)))
         if g_in == g_out && input.node != output.node =>
       {
-        Some((input, Some(output)))
+        Some((input, Some((output, dt))))
       }
       // Connect output to input.
-      (Self::Output(g_out, output, _), Some(Self::Input(g_in, input, _)))
+      (Self::Output(g_out, output, dt), Some(Self::Input(g_in, input, _)))
         if g_in == g_out && input.node != output.node =>
       {
-        Some((input, Some(output)))
+        Some((input, Some((output, dt))))
       }
       // Other non-compatible connections.
       _ => None,
