@@ -625,8 +625,9 @@ impl NodeGraph {
             .data(|d| d.get_temp::<NodeSocketMeta>(src.ui_id()))
             .unwrap();
           let center = (src_meta.center * zoom).to_pos2() + ui_min;
-          ui.painter()
-            .line_segment([center, end], node_style.line_stroke);
+          let mut stroke = node_style.line_stroke;
+          stroke.color = src.color();
+          ui.painter().line_segment([center, end], stroke);
         }
       }
 
@@ -649,7 +650,9 @@ impl NodeGraph {
           let rect = egui::Rect::from_points(&[in_pos, out_pos]);
           // Check if part of the connection is visible.
           if ui.is_rect_visible(rect) {
-            painter.line_segment([in_pos, out_pos], node_style.line_stroke);
+            let mut stroke = node_style.line_stroke;
+            stroke.color = out_meta.color();
+            painter.line_segment([in_pos, out_pos], stroke);
           }
         }
       }

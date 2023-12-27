@@ -26,7 +26,7 @@ impl Default for NodeStyle {
   fn default() -> Self {
     Self {
       node_min_size: (200.0, 10.0).into(),
-      line_stroke: (5.0, egui::Color32::WHITE).into(),
+      line_stroke: (3.0, egui::Color32::WHITE).into(),
       zoom: 1.0,
     }
   }
@@ -54,7 +54,7 @@ pub trait NodeGraphAccess {
 
   fn get_dropped_node_sockets(&mut self) -> Option<(NodeSocketId, Option<NodeSocketId>)>;
 
-  fn update_node_socket(&mut self, id: NodeSocketId, pos: egui::Pos2);
+  fn update_node_socket(&mut self, id: NodeSocketId, pos: egui::Pos2, dt: DataType);
 
   fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2;
 
@@ -100,13 +100,14 @@ impl NodeGraphAccess for egui::Ui {
     })
   }
 
-  fn update_node_socket(&mut self, id: NodeSocketId, pos: egui::Pos2) {
+  fn update_node_socket(&mut self, id: NodeSocketId, pos: egui::Pos2, dt: DataType) {
     self.data_mut(|d| {
       let graph = d
         .get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META))
         .unwrap_or_default();
       let meta = d.get_temp_mut_or_default::<NodeSocketMeta>(id.ui_id());
       meta.center = graph.ui_to_graph(pos);
+      meta.dt = dt;
     });
   }
 
@@ -158,9 +159,25 @@ impl NodeGraphMeta {
   }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct NodeSocketMeta {
   pub center: egui::Vec2,
+  pub dt: DataType,
+}
+
+impl Default for NodeSocketMeta {
+  fn default() -> Self {
+    Self {
+      center: Default::default(),
+      dt: DataType::F32,
+    }
+  }
+}
+
+impl NodeSocketMeta {
+  pub fn color(&self) -> egui::Color32 {
+    self.dt.color()
+  }
 }
 
 pub struct NodeSocket {
@@ -171,6 +188,10 @@ pub struct NodeSocket {
 impl NodeSocket {
   pub fn new(id: NodeSocketId, connected: bool) -> Self {
     Self { id, connected }
+  }
+
+  pub fn color(&self) -> egui::Color32 {
+    self.id.color()
   }
 }
 
@@ -191,7 +212,8 @@ impl egui::Widget for NodeSocket {
     let center = small_icon_rect.center();
 
     // Update socket metadata.
-    ui.update_node_socket(id, center);
+    let color = self.color();
+    ui.update_node_socket(id, center, self.id.data_type());
 
     // 3. Interact: Time to check for clicks!
     if response.drag_started() {
@@ -219,10 +241,12 @@ impl egui::Widget for NodeSocket {
     // "how should something that is being interacted with be painted?".
     // This will, for instance, give us different colors when the widget is hovered or clicked.
     let style = ui.style();
-    let mut visuals = style.interact_selectable(&response, selected);
+    let visuals = style.interact_selectable(&response, selected);
+    let mut bg_stroke = visuals.bg_stroke;
+    bg_stroke.color = color;
     // HACK: response.hovered() doesn't work during drag.
     if hovered {
-      visuals.bg_stroke = style.visuals.widgets.hovered.bg_stroke;
+      bg_stroke = bg_stroke;
     }
 
     // Attach some meta-data to the response which can be used by screen readers:
@@ -237,14 +261,10 @@ impl egui::Widget for NodeSocket {
 
       let painter = ui.painter();
 
-      painter.circle(center, big_radius, visuals.bg_fill, visuals.bg_stroke);
+      painter.circle(center, big_radius, visuals.bg_fill, bg_stroke);
 
       if selected {
-        painter.circle_filled(
-          center,
-          small_radius,
-          visuals.fg_stroke.color, // Intentional to use stroke and not fill
-        );
+        painter.circle_filled(center, small_radius, color);
       }
     }
     response
@@ -322,6 +342,17 @@ impl NodeSocketId {
       Self::Output(_, id, _) => Some(*id),
       _ => None,
     }
+  }
+
+  pub fn data_type(&self) -> DataType {
+    match self {
+      Self::Input(_, _, dt) => *dt,
+      Self::Output(_, _, dt) => *dt,
+    }
+  }
+
+  pub fn color(&self) -> egui::Color32 {
+    self.data_type().color()
   }
 
   pub fn ui_id(&self) -> egui::Id {
