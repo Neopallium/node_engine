@@ -1,6 +1,7 @@
 use egui::{self, NumExt};
 
 use crate::node::{InputId, NodeId, OutputId};
+use crate::values::DataType;
 
 mod frame;
 mod zoom;
@@ -252,26 +253,26 @@ impl egui::Widget for NodeSocket {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NodeSocketId {
-  Input(u32, InputId),
-  Output(u32, OutputId),
+  Input(u32, InputId, DataType),
+  Output(u32, OutputId, DataType),
 }
 
 impl NodeSocketId {
-  pub fn input(graph: u32, node: NodeId, idx: u32) -> Self {
-    Self::Input(graph, InputId::new(node, idx))
+  pub fn input(graph: u32, node: NodeId, idx: u32, dt: DataType) -> Self {
+    Self::Input(graph, InputId::new(node, idx), dt)
   }
 
-  pub fn output(graph: u32, node: NodeId, idx: u32) -> Self {
-    Self::Output(graph, OutputId::new(node, idx))
+  pub fn output(graph: u32, node: NodeId, idx: u32, dt: DataType) -> Self {
+    Self::Output(graph, OutputId::new(node, idx), dt)
   }
 
   pub fn is_compatible(&self, dst: NodeSocketId) -> bool {
     match (self, &dst) {
-      (Self::Input(g_in, input), Self::Output(g_out, output))
-      | (Self::Output(g_out, output), Self::Input(g_in, input))
+      (Self::Input(g_in, input, dt_in), Self::Output(g_out, output, dt_out))
+      | (Self::Output(g_out, output, dt_out), Self::Input(g_in, input, dt_in))
         if g_in == g_out =>
       {
-        input.node != output.node
+        input.node != output.node && dt_in.is_compatible(dt_out)
       }
       _ => false,
     }
@@ -280,15 +281,15 @@ impl NodeSocketId {
   pub fn input_first(&self, dst: Option<NodeSocketId>) -> Option<(Self, Option<Self>)> {
     match (*self, dst) {
       // Disconect input.
-      (Self::Input(_, _), None) => Some((*self, None)),
+      (Self::Input(_, _, _), None) => Some((*self, None)),
       // Connect input to output.
-      (Self::Input(g_in, input), Some(Self::Output(g_out, output)))
+      (Self::Input(g_in, input, _), Some(Self::Output(g_out, output, _)))
         if g_in == g_out && input.node != output.node =>
       {
         Some((*self, dst))
       }
       // Connect output to input.
-      (Self::Output(g_out, output), Some(Self::Input(g_in, input)))
+      (Self::Output(g_out, output, _), Some(Self::Input(g_in, input, _)))
         if g_in == g_out && input.node != output.node =>
       {
         Some((dst.unwrap(), Some(*self)))
@@ -301,15 +302,15 @@ impl NodeSocketId {
   pub fn input_id_first(&self, dst: Option<NodeSocketId>) -> Option<(InputId, Option<OutputId>)> {
     match (*self, dst) {
       // Disconect input.
-      (Self::Input(_, id), None) => Some((id, None)),
+      (Self::Input(_, id, _), None) => Some((id, None)),
       // Connect input to output.
-      (Self::Input(g_in, input), Some(Self::Output(g_out, output)))
+      (Self::Input(g_in, input, _), Some(Self::Output(g_out, output, _)))
         if g_in == g_out && input.node != output.node =>
       {
         Some((input, Some(output)))
       }
       // Connect output to input.
-      (Self::Output(g_out, output), Some(Self::Input(g_in, input)))
+      (Self::Output(g_out, output, _), Some(Self::Input(g_in, input, _)))
         if g_in == g_out && input.node != output.node =>
       {
         Some((input, Some(output)))
@@ -325,7 +326,7 @@ impl NodeSocketId {
 
   pub fn as_input_id(&self) -> Option<InputId> {
     match self {
-      Self::Input(_, id) => Some(*id),
+      Self::Input(_, id, _) => Some(*id),
       _ => None,
     }
   }
@@ -336,15 +337,15 @@ impl NodeSocketId {
 
   pub fn as_output_id(&self) -> Option<OutputId> {
     match self {
-      Self::Output(_, id) => Some(*id),
+      Self::Output(_, id, _) => Some(*id),
       _ => None,
     }
   }
 
   pub fn ui_id(&self) -> egui::Id {
     match self {
-      Self::Input(_graph, id) => id.ui_id(),
-      Self::Output(_graph, id) => id.ui_id(),
+      Self::Input(_graph, id, _) => id.ui_id(),
+      Self::Output(_graph, id, _) => id.ui_id(),
     }
   }
 }

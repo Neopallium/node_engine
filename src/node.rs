@@ -139,7 +139,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
   #[cfg(feature = "egui")]
   fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
     let mut input_changed = None;
-    for (idx, (name, _def)) in self.def().inputs.iter().enumerate() {
+    for (idx, (name, def)) in self.def().inputs.iter().enumerate() {
       let idx = idx as u32;
       ui.horizontal(|ui| {
         let input_key = InputKey::from(idx);
@@ -152,7 +152,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
             return;
           }
         };
-        let input_id = NodeSocketId::input(0, id, idx);
+        let input_id = NodeSocketId::input(0, id, idx, def.value_type);
         ui.add(NodeSocket::new(input_id, connected));
         if connected {
           ui.label(name);
@@ -201,12 +201,11 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
 
   #[cfg(feature = "egui")]
   fn outputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
-    let def = self.def();
-    for (idx, name) in def.outputs.keys().enumerate() {
+    for (idx, (name, def)) in self.def().outputs.iter().enumerate() {
       ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
           let connected = false;
-          let output_id = NodeSocketId::output(0, id, idx as _);
+          let output_id = NodeSocketId::output(0, id, idx as _, def.value_type);
           ui.add(NodeSocket::new(output_id, connected));
           ui.label(format!("{}", name));
         });

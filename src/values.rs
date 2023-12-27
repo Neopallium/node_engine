@@ -12,7 +12,14 @@ use anyhow::{anyhow, Result};
 use crate::ui::*;
 use crate::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DataTypeClass {
+  Scalar,
+  Vector,
+  Matrix,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DataType {
   I32,
   U32,
@@ -26,6 +33,20 @@ pub enum DataType {
 }
 
 impl DataType {
+  pub fn class(&self) -> DataTypeClass {
+    match self {
+      Self::I32 => DataTypeClass::Scalar,
+      Self::U32 => DataTypeClass::Scalar,
+      Self::F32 => DataTypeClass::Scalar,
+      Self::Vec2 => DataTypeClass::Vector,
+      Self::Vec3 => DataTypeClass::Vector,
+      Self::Vec4 => DataTypeClass::Vector,
+      Self::Mat2 => DataTypeClass::Matrix,
+      Self::Mat3 => DataTypeClass::Matrix,
+      Self::Mat4 => DataTypeClass::Matrix,
+    }
+  }
+
   pub fn default_value(&self) -> Value {
     match self {
       Self::I32 => Value::I32(Default::default()),
@@ -37,6 +58,33 @@ impl DataType {
       Self::Mat2 => Value::Mat2(Default::default()),
       Self::Mat3 => Value::Mat3(Default::default()),
       Self::Mat4 => Value::Mat4(Default::default()),
+    }
+  }
+
+  #[cfg(feature = "egui")]
+  pub fn color(&self) -> egui::Color32 {
+    match self {
+      Self::I32 => egui::Color32::LIGHT_BLUE,
+      Self::U32 => egui::Color32::LIGHT_BLUE,
+      Self::F32 => egui::Color32::LIGHT_BLUE,
+      Self::Vec2 => egui::Color32::GREEN,
+      Self::Vec3 => egui::Color32::YELLOW,
+      Self::Vec4 => egui::Color32::LIGHT_RED,
+      Self::Mat2 => egui::Color32::BLUE,
+      Self::Mat3 => egui::Color32::BLUE,
+      Self::Mat4 => egui::Color32::BLUE,
+    }
+  }
+
+  pub fn is_compatible(&self, other: &DataType) -> bool {
+    if self == other {
+      // Same type is compatible.
+      true
+    } else if self.class() == other.class() {
+      // Same class is compatible.
+      true
+    } else {
+      false
     }
   }
 }
