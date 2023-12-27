@@ -4,10 +4,7 @@ use core::fmt;
 use heck::ToTitleCase;
 use indexmap::IndexSet;
 
-use glam::{
-  Vec2, Vec3, Vec4,
-  Mat2, Mat3, Mat4,
-};
+use glam::{Mat2, Mat3, Mat4, Vec2, Vec3, Vec4};
 
 use anyhow::{anyhow, Result};
 
@@ -595,13 +592,16 @@ impl ValueType for f32 {
 }
 
 #[cfg(feature = "egui")]
-const COLUMNS: [&str; 4] = [
-  "X", "Y", "Z", "W"
-];
+const COLUMNS: [&str; 4] = ["X", "Y", "Z", "W"];
 
 #[cfg(feature = "egui")]
-fn f32_table_ui(ui: &mut egui::Ui, columns: &[&str], rows: usize, values: &mut [f32]) -> egui::Response {
-  use egui_extras::{TableBuilder, Column};
+fn f32_table_ui(
+  ui: &mut egui::Ui,
+  columns: &[&str],
+  rows: usize,
+  values: &mut [f32],
+) -> egui::Response {
+  use egui_extras::{Column, TableBuilder};
 
   let node_style = ui.node_style();
   let mut resp = ui.interact(ui.min_rect(), ui.id(), egui::Sense::click());
@@ -612,7 +612,7 @@ fn f32_table_ui(ui: &mut egui::Ui, columns: &[&str], rows: usize, values: &mut [
   ui.set_min_height(height * (rows + 1) as f32);
 
   // Make sure the layout is in vertical mode.
-  ui.vertical(|ui | {
+  ui.vertical(|ui| {
     TableBuilder::new(ui)
       .columns(Column::exact(width), columns.len())
       .vscroll(false)
