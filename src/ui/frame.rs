@@ -250,7 +250,10 @@ pub trait NodeFrame: GetId {
     if self.auto_size() {
       // Update frame size.
       let size = ui.min_rect().size() / zoom;
-      self.set_rect(emath::Rect::from_min_size(self.rect().min, size));
+      if self.rect().size() != size {
+        self.frame_state_mut().updated = true;
+        self.set_rect(emath::Rect::from_min_size(self.rect().min, size));
+      }
     }
     resp
   }

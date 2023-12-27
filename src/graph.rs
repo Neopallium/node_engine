@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use indexmap::IndexMap;
@@ -554,11 +555,14 @@ impl NodeGraph {
 
       // Render nodes.
       let mut remove_node = None;
-      let mut resize_group = None;
+      let mut resize_groups = BTreeSet::new();
       for (node_id, node) in &mut self.nodes.0 {
         let resp = node.render(ui, origin);
-        if resp.dragged() {
-          resize_group = Some(node.group_id);
+        // If the node was moved/resized or updated, recalculate the group size.
+        if resp.dragged() || node.updated() {
+          if !node.group_id.is_nil() {
+            resize_groups.insert(node.group_id);
+          }
         }
         resp.context_menu(|ui| {
           if ui.button("Delete").clicked() {
@@ -567,7 +571,7 @@ impl NodeGraph {
           }
           if !node.group_id.is_nil() {
             if ui.button("Remove from group").clicked() {
-              resize_group = Some(node.group_id);
+              resize_groups.insert(node.group_id);
               node.group_id = Uuid::nil();
               ui.close_menu();
             }
@@ -578,7 +582,7 @@ impl NodeGraph {
       if let Some(node_id) = remove_node {
         self.remove(node_id);
       }
-      if let Some(group_id) = resize_group {
+      for group_id in resize_groups {
         self.resize_group(group_id);
       }
 
