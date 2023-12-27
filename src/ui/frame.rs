@@ -125,6 +125,14 @@ pub trait NodeFrame: GetId {
     self.frame_state().selected
   }
 
+  /// Set frame selected state.
+  fn set_selected(&mut self, selected: bool) -> bool {
+    let state = self.frame_state_mut();
+    let old = state.selected;
+    state.selected = selected;
+    old
+  }
+
   /// Handle drag events from other UI responses.
   /// This is mainly to handle drag events from the title bar.
   fn handle_dragged(&mut self, resp: &egui::Response, zoom: f32) {

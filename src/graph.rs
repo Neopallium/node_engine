@@ -84,6 +84,8 @@ pub struct EditorState {
   scroll_offset: emath::Vec2,
   #[serde(skip)]
   current_pos: emath::Vec2,
+  #[serde(skip)]
+  selecting: Option<emath::Vec2>,
 }
 
 impl Default for EditorState {
@@ -96,6 +98,7 @@ impl Default for EditorState {
       zoom: 0.5,
       scroll_offset: origin - emath::vec2(450., 250.),
       current_pos: Default::default(),
+      selecting: None,
     }
   }
 }
@@ -214,6 +217,21 @@ pub struct NodeGraph {
 impl NodeGraph {
   pub fn new() -> Self {
     Self::default()
+  }
+
+  pub fn take_selected(&mut self) -> Vec<NodeId> {
+    self.nodes.0.iter_mut().filter_map(|(id, node)| {
+      if node.selected() {
+        node.set_selected(false);
+        Some(*id)
+      } else {
+        None
+      }
+    }).collect()
+  }
+
+  pub fn clear_selected(&mut self) {
+    self.take_selected();
   }
 
   pub fn group_selected_nodes(&mut self) -> Option<NodeGroupId> {
@@ -393,12 +411,35 @@ impl NodeGraph {
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, ui: &mut egui::Ui) {
-    // Use mouse wheel for zoom instead of scrolling.
-    // Mouse wheel + ctrl scrolling left/right.
-    // Multitouch (pinch gesture) zoom.
+  pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<egui::Response> {
     let mut scrolling = true;
+    let mut selecting = true;
+    let mut clear_selected = true;
+    // Detect drag mode.
+    // * Select nodes only in dragged area - Primary mouse button and no modifiers.
+    // * Add nodes in dragged area to selected set - Primary mouse button + SHIFT.
+    // * Scroll - Primary mouse button + CTRL.
+    ui.input(|i| {
+      // Enable scrolling when CTRL is down.
+      if i.modifiers.ctrl {
+        selecting = false;
+      }
+      // Don't scroll from secondary mouse button.
+      if i.pointer.secondary_down() {
+        // Don't clear selected when opening the Context menu.
+        clear_selected = false;
+        scrolling = false;
+      }
+      // When SHIFT is down keep current selected nodes.
+      if i.modifiers.shift {
+        clear_selected = false;
+      }
+    });
+
     if ui.ui_contains_pointer() {
+      // Use mouse wheel for zoom instead of scrolling.
+      // Mouse wheel + ctrl scrolling left/right.
+      // Multitouch (pinch gesture) zoom.
       let z_delta = ui.input(|i| {
         // Use up/down mouse wheel for zoom.
         let scroll_delta = i.scroll_delta.y;
@@ -424,7 +465,7 @@ impl NodeGraph {
       .scroll_offset(scroll_offset);
 
     // Show scroll area.
-    let resp = scroll_area.show(ui, |ui| {
+    let out = scroll_area.show(ui, |ui| {
       // Save old node style.
       let old_node_style = ui.node_style();
 
@@ -440,10 +481,44 @@ impl NodeGraph {
       ui.set_node_graph_meta(NodeGraphMeta { ui_min, zoom });
 
       // Convert pointer position to graph-space.  (Used for adding new nodes).
+      let mut select_area = None;
       if ui.ui_contains_pointer() {
         if let Some(pos) = ui.ctx().pointer_latest_pos() {
           self.editor.current_pos = (pos - origin).to_vec2() / zoom;
+
         }
+      }
+      // When not scrolling, detect click and drag to select nodes.
+      let mut area_resp = None;
+      if selecting {
+        let id = ui.next_auto_id();
+        let rect = ui.available_rect_before_wrap();
+        let resp = ui.interact(rect, id, egui::Sense::click_and_drag());
+        if resp.drag_started() {
+          if self.editor.selecting.is_none() && clear_selected {
+            // Clear old selected states.
+            self.clear_selected();
+          }
+          self.editor.selecting = Some(self.editor.current_pos);
+        }
+        if let Some(start) = &self.editor.selecting {
+          select_area = Some(egui::Rect::from_points(&[
+            start.to_pos2(),
+            self.editor.current_pos.to_pos2(),
+          ]));
+        }
+        if resp.drag_released() {
+          self.editor.selecting = None;
+          // Select nodes.
+          if let Some(area) = select_area.take() {
+            for (_, node) in &mut self.nodes.0 {
+              if area.intersects(node.rect()) {
+                node.set_selected(true);
+              }
+            }
+          }
+        }
+        area_resp = Some(resp);
       }
 
       // Render groups.
@@ -569,11 +644,22 @@ impl NodeGraph {
         }
       }
 
+      if let Some(mut select_area) = select_area {
+        select_area.zoom(zoom);
+        let rect = select_area.translate(origin);
+        ui.painter()
+          .rect_stroke(rect, 0.0, (0.5, egui::Color32::LIGHT_GRAY));
+      }
+
       // Restore old NodeStyle.
       ui.set_node_style(old_node_style);
+
+      area_resp
     });
     // Save scroll offset and de-zoom it.
-    self.editor.scroll_offset = resp.state.offset / zoom;
+    self.editor.scroll_offset = out.state.offset / zoom;
+
+    out.inner
   }
 }
 
@@ -613,32 +699,33 @@ impl NodeGraphEditor {
         egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
           ui.label("TODO: Node finder here");
         });
-        let resp = egui::CentralPanel::default()
+        let out = egui::CentralPanel::default()
           .show_inside(ui, |ui| {
-            self.graph.ui(ui);
-          })
-          .response;
-        // Graph menu.
-        resp.context_menu(|ui| {
-          if self.next_position.is_none() {
-            self.next_position = Some(self.graph.editor.current_pos);
-          }
-          ui.menu_button("Create node", |ui| {
-            // Node filter UI.
-            self.node_filter.ui(ui);
-            if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
-              if let Some(position) = self.next_position.take() {
-                node.set_position(position);
+            self.graph.ui(ui)
+          });
+        if let Some(resp) = out.inner {
+          // Graph menu.
+          resp.context_menu(|ui| {
+            if self.next_position.is_none() {
+              self.next_position = Some(self.graph.editor.current_pos);
+            }
+            ui.menu_button("Create node", |ui| {
+              // Node filter UI.
+              self.node_filter.ui(ui);
+              if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
+                if let Some(position) = self.next_position.take() {
+                  node.set_position(position);
+                }
+                self.graph.add(node);
+                ui.close_menu();
               }
-              self.graph.add(node);
+            });
+            if ui.button("Group Nodes").clicked() {
+              self.graph.group_selected_nodes();
               ui.close_menu();
             }
           });
-          if ui.button("Group Nodes").clicked() {
-            self.graph.group_selected_nodes();
-            ui.close_menu();
-          }
-        });
+        }
       });
   }
 }
