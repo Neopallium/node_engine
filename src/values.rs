@@ -4,106 +4,125 @@ use core::fmt;
 use heck::ToTitleCase;
 use indexmap::IndexSet;
 
-use glam::{Vec2, Vec3, Vec4};
+use glam::{
+  Vec2, Vec3, Vec4,
+  Mat2, Mat3, Mat4,
+};
 
 use anyhow::{anyhow, Result};
 
+#[cfg(feature = "egui")]
+use crate::ui::*;
 use crate::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DataType {
-  Scalar,
+  I32,
+  U32,
+  F32,
   Vec2,
   Vec3,
   Vec4,
+  Mat2,
+  Mat3,
+  Mat4,
 }
 
 impl DataType {
   pub fn default_value(&self) -> Value {
     match self {
-      Self::Scalar => Value::Scalar(Default::default()),
+      Self::I32 => Value::I32(Default::default()),
+      Self::U32 => Value::U32(Default::default()),
+      Self::F32 => Value::F32(Default::default()),
       Self::Vec2 => Value::Vec2(Default::default()),
       Self::Vec3 => Value::Vec3(Default::default()),
       Self::Vec4 => Value::Vec4(Default::default()),
+      Self::Mat2 => Value::Mat2(Default::default()),
+      Self::Mat3 => Value::Mat3(Default::default()),
+      Self::Mat4 => Value::Mat4(Default::default()),
     }
   }
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Value {
-  Scalar(f32),
+  I32(i32),
+  U32(u32),
+  F32(f32),
   Vec2(Vec2),
   Vec3(Vec3),
   Vec4(Vec4),
+  Mat2(Mat2),
+  Mat3(Mat3),
+  Mat4(Mat4),
 }
 
 impl Default for Value {
   fn default() -> Self {
-    Self::Scalar(Default::default())
+    Self::F32(Default::default())
   }
 }
 
 impl Value {
-  pub fn as_f32(&self) -> Result<f32> {
-    match self {
-      Self::Scalar(v) => Ok(*v),
-      _ => Err(anyhow!("Expected a Scalar got: {self:?}")),
-    }
-  }
-
-  pub fn as_vec2(&self) -> Result<Vec2> {
-    match self {
-      Self::Vec2(v) => Ok(*v),
-      _ => Err(anyhow!("Expected a Vec2 got: {self:?}")),
-    }
-  }
-
-  pub fn as_vec3(&self) -> Result<Vec3> {
-    match self {
-      Self::Vec3(v) => Ok(*v),
-      _ => Err(anyhow!("Expected a Vec3 got: {self:?}")),
-    }
-  }
-
-  pub fn as_vec4(&self) -> Result<Vec4> {
-    match self {
-      Self::Vec4(v) => Ok(*v),
-      _ => Err(anyhow!("Expected a Vec4 got: {self:?}")),
-    }
-  }
-
   pub fn as_any(&self) -> &dyn Any {
     match self {
-      Self::Scalar(v) => v,
+      Self::I32(v) => v,
+      Self::U32(v) => v,
+      Self::F32(v) => v,
       Self::Vec2(v) => v,
       Self::Vec3(v) => v,
       Self::Vec4(v) => v,
+      Self::Mat2(v) => v,
+      Self::Mat3(v) => v,
+      Self::Mat4(v) => v,
     }
   }
 
   pub fn data_type(&self) -> DataType {
     match self {
-      Self::Scalar(_) => DataType::Scalar,
+      Self::I32(_) => DataType::I32,
+      Self::U32(_) => DataType::U32,
+      Self::F32(_) => DataType::F32,
       Self::Vec2(_) => DataType::Vec2,
       Self::Vec3(_) => DataType::Vec3,
       Self::Vec4(_) => DataType::Vec4,
+      Self::Mat2(_) => DataType::Mat2,
+      Self::Mat3(_) => DataType::Mat3,
+      Self::Mat4(_) => DataType::Mat4,
     }
   }
 
   #[cfg(feature = "egui")]
   pub fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
     match self {
-      Self::Scalar(v) => v.ui(ui),
+      Self::I32(v) => v.ui(ui),
+      Self::U32(v) => v.ui(ui),
+      Self::F32(v) => v.ui(ui),
       Self::Vec2(v) => v.ui(ui),
       Self::Vec3(v) => v.ui(ui),
       Self::Vec4(v) => v.ui(ui),
+      Self::Mat2(v) => v.ui(ui),
+      Self::Mat3(v) => v.ui(ui),
+      Self::Mat4(v) => v.ui(ui),
     }
+  }
+}
+
+impl From<i32> for Value {
+  fn from(v: i32) -> Self {
+    Self::I32(v)
+  }
+}
+
+impl From<u32> for Value {
+  fn from(v: u32) -> Self {
+    Self::U32(v)
   }
 }
 
 impl From<f32> for Value {
   fn from(v: f32) -> Self {
-    Self::Scalar(v)
+    Self::F32(v)
   }
 }
 
@@ -122,6 +141,24 @@ impl From<Vec3> for Value {
 impl From<Vec4> for Value {
   fn from(v: Vec4) -> Self {
     Self::Vec4(v)
+  }
+}
+
+impl From<Mat2> for Value {
+  fn from(v: Mat2) -> Self {
+    Self::Mat2(v)
+  }
+}
+
+impl From<Mat3> for Value {
+  fn from(v: Mat3) -> Self {
+    Self::Mat3(v)
+  }
+}
+
+impl From<Mat4> for Value {
+  fn from(v: Mat4) -> Self {
+    Self::Mat4(v)
   }
 }
 
@@ -491,17 +528,64 @@ impl<T: ValueType> InputTyped<T> {
   }
 }
 
-impl ValueType for f32 {
+impl ValueType for i32 {
   fn to_value(&self) -> Value {
-    Value::Scalar(*self)
+    Value::I32(*self)
   }
 
   fn from_value(value: Value) -> Result<Self> {
-    value.as_f32()
+    match value {
+      Value::I32(v) => Ok(v),
+      _ => Err(anyhow!("Expected a I32 got: {value:?}")),
+    }
   }
 
   fn data_type() -> DataType {
-    DataType::Scalar
+    DataType::I32
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    ui.add(egui::DragValue::new(self).speed(1))
+  }
+}
+
+impl ValueType for u32 {
+  fn to_value(&self) -> Value {
+    Value::U32(*self)
+  }
+
+  fn from_value(value: Value) -> Result<Self> {
+    match value {
+      Value::U32(v) => Ok(v),
+      _ => Err(anyhow!("Expected a U32 got: {value:?}")),
+    }
+  }
+
+  fn data_type() -> DataType {
+    DataType::U32
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    ui.add(egui::DragValue::new(self).speed(1))
+  }
+}
+
+impl ValueType for f32 {
+  fn to_value(&self) -> Value {
+    Value::F32(*self)
+  }
+
+  fn from_value(value: Value) -> Result<Self> {
+    match value {
+      Value::F32(v) => Ok(v),
+      _ => Err(anyhow!("Expected a F32 got: {value:?}")),
+    }
+  }
+
+  fn data_type() -> DataType {
+    DataType::F32
   }
 
   #[cfg(feature = "egui")]
@@ -510,13 +594,71 @@ impl ValueType for f32 {
   }
 }
 
+#[cfg(feature = "egui")]
+const COLUMNS: [&str; 4] = [
+  "X", "Y", "Z", "W"
+];
+
+#[cfg(feature = "egui")]
+fn f32_table_ui(ui: &mut egui::Ui, columns: &[&str], rows: usize, values: &mut [f32]) -> egui::Response {
+  use egui_extras::{TableBuilder, Column};
+
+  let node_style = ui.node_style();
+  let mut resp = ui.interact(ui.min_rect(), ui.id(), egui::Sense::click());
+  let height = 20.0 * node_style.zoom;
+  let width = 40.0 * node_style.zoom;
+
+  // Allocate space for the table.
+  ui.set_min_height(height * (rows + 1) as f32);
+
+  // Make sure the layout is in vertical mode.
+  ui.vertical(|ui | {
+    TableBuilder::new(ui)
+      .columns(Column::exact(width), columns.len())
+      .vscroll(false)
+      .header(height, |mut header| {
+        for col in columns {
+          header.col(|ui| {
+            ui.heading(*col);
+          });
+        }
+      })
+      .body(|body| {
+        body.rows(height, rows, |row_index, mut row| {
+          for col in 0..columns.len() {
+            row.col(|ui| {
+              if values[col * rows + row_index].ui(ui).changed() {
+                resp.mark_changed();
+              }
+            });
+          }
+        });
+      });
+  });
+  resp
+}
+
+#[cfg(feature = "egui")]
+fn vector_ui(ui: &mut egui::Ui, values: &mut [f32]) -> egui::Response {
+  let len = values.len();
+  f32_table_ui(ui, &COLUMNS[0..len], 1, values)
+}
+
+#[cfg(feature = "egui")]
+fn matrix_ui(ui: &mut egui::Ui, dim: usize, values: &mut [f32]) -> egui::Response {
+  f32_table_ui(ui, &COLUMNS[0..dim], dim, values)
+}
+
 impl ValueType for Vec2 {
   fn to_value(&self) -> Value {
     Value::Vec2(*self)
   }
 
   fn from_value(value: Value) -> Result<Self> {
-    value.as_vec2()
+    match value {
+      Value::Vec2(v) => Ok(v),
+      _ => Err(anyhow!("Expected a Vec2 got: {value:?}")),
+    }
   }
 
   fn data_type() -> DataType {
@@ -525,10 +667,7 @@ impl ValueType for Vec2 {
 
   #[cfg(feature = "egui")]
   fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    ui.label("x");
-    let resp = ui.add(egui::DragValue::new(&mut self.x).speed(0.1));
-    ui.label("y");
-    resp | ui.add(egui::DragValue::new(&mut self.y).speed(0.1))
+    vector_ui(ui, self.as_mut())
   }
 }
 
@@ -538,7 +677,10 @@ impl ValueType for Vec3 {
   }
 
   fn from_value(value: Value) -> Result<Self> {
-    value.as_vec3()
+    match value {
+      Value::Vec3(v) => Ok(v),
+      _ => Err(anyhow!("Expected a Vec3 got: {value:?}")),
+    }
   }
 
   fn data_type() -> DataType {
@@ -547,12 +689,7 @@ impl ValueType for Vec3 {
 
   #[cfg(feature = "egui")]
   fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    ui.label("x");
-    let mut resp = ui.add(egui::DragValue::new(&mut self.x).speed(0.1));
-    ui.label("y");
-    resp |= ui.add(egui::DragValue::new(&mut self.y).speed(0.1));
-    ui.label("z");
-    resp | ui.add(egui::DragValue::new(&mut self.z).speed(0.1))
+    vector_ui(ui, self.as_mut())
   }
 }
 
@@ -562,7 +699,10 @@ impl ValueType for Vec4 {
   }
 
   fn from_value(value: Value) -> Result<Self> {
-    value.as_vec4()
+    match value {
+      Value::Vec4(v) => Ok(v),
+      _ => Err(anyhow!("Expected a Vec4 got: {value:?}")),
+    }
   }
 
   fn data_type() -> DataType {
@@ -571,14 +711,73 @@ impl ValueType for Vec4 {
 
   #[cfg(feature = "egui")]
   fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    ui.label("x");
-    let mut resp = ui.add(egui::DragValue::new(&mut self.x).speed(0.1));
-    ui.label("y");
-    resp |= ui.add(egui::DragValue::new(&mut self.y).speed(0.1));
-    ui.label("z");
-    resp |= ui.add(egui::DragValue::new(&mut self.z).speed(0.1));
-    ui.label("w");
-    resp | ui.add(egui::DragValue::new(&mut self.w).speed(0.1))
+    vector_ui(ui, self.as_mut())
+  }
+}
+
+impl ValueType for Mat2 {
+  fn to_value(&self) -> Value {
+    Value::Mat2(*self)
+  }
+
+  fn from_value(value: Value) -> Result<Self> {
+    match value {
+      Value::Mat2(v) => Ok(v),
+      _ => Err(anyhow!("Expected a Mat2 got: {value:?}")),
+    }
+  }
+
+  fn data_type() -> DataType {
+    DataType::Mat2
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    matrix_ui(ui, 2, &mut self.as_mut()[..])
+  }
+}
+
+impl ValueType for Mat3 {
+  fn to_value(&self) -> Value {
+    Value::Mat3(*self)
+  }
+
+  fn from_value(value: Value) -> Result<Self> {
+    match value {
+      Value::Mat3(v) => Ok(v),
+      _ => Err(anyhow!("Expected a Mat3 got: {value:?}")),
+    }
+  }
+
+  fn data_type() -> DataType {
+    DataType::Mat3
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    matrix_ui(ui, 3, &mut self.as_mut()[..])
+  }
+}
+
+impl ValueType for Mat4 {
+  fn to_value(&self) -> Value {
+    Value::Mat4(*self)
+  }
+
+  fn from_value(value: Value) -> Result<Self> {
+    match value {
+      Value::Mat4(v) => Ok(v),
+      _ => Err(anyhow!("Expected a Mat4 got: {value:?}")),
+    }
+  }
+
+  fn data_type() -> DataType {
+    DataType::Mat4
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+    matrix_ui(ui, 4, &mut self.as_mut()[..])
   }
 }
 

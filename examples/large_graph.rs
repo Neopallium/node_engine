@@ -30,7 +30,7 @@ fn build_sub_graph(
 }
 
 fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, NodeGraph, f32)> {
-  let scalar = reg.new_by_name("Scalar Math").expect("Scalar math node");
+  let scalar = reg.new_by_name("F32 Math").expect("F32 math node");
   let mut graph = NodeGraph::new();
 
   let position = [max_depth as f32 * X_OFFSET, 0.].into();
@@ -52,10 +52,10 @@ fn main() -> anyhow::Result<()> {
   let mut execution = NodeGraphExecution::new();
   for _ in 0..count {
     let res = execution.eval_graph(&graph)?;
-    if let Value::Scalar(v) = &res {
+    if let Value::F32(v) = &res {
       total += *v;
     }
-    assert_eq!(res, Value::Scalar(expected));
+    assert_eq!(res, Value::F32(expected));
   }
 
   eprintln!("total: {total}");

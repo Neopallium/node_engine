@@ -148,7 +148,13 @@ impl NodeGraphCompile {
 
   pub fn compile_value(&mut self, value: &Value) -> Result<String> {
     Ok(match value {
-      Value::Scalar(val) => {
+      Value::I32(val) => {
+        format!("{val:?}")
+      }
+      Value::U32(val) => {
+        format!("{val:?}")
+      }
+      Value::F32(val) => {
         format!("{val:?}")
       }
       Value::Vec2(v) => {
@@ -159,6 +165,18 @@ impl NodeGraphCompile {
       }
       Value::Vec4(v) => {
         format!("vec4<f32>({:?}, {:?}, {:?}, {:?})", v.x, v.y, v.z, v.w)
+      }
+      Value::Mat2(v) => {
+        // TODO: Convert to wgsl syntax.
+        format!("{v:?}")
+      }
+      Value::Mat3(v) => {
+        // TODO: Convert to wgsl syntax.
+        format!("{v:?}")
+      }
+      Value::Mat4(v) => {
+        // TODO: Convert to wgsl syntax.
+        format!("{v:?}")
       }
     })
   }

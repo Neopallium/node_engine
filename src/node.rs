@@ -109,6 +109,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
     let def = self.def();
     let input_count = def.inputs.len();
     let output_count = def.outputs.len();
+    let param_count = def.parameters.len();
     let node_style = ui.node_style();
     let zoom = node_style.zoom;
     ui.vertical(|ui| {
@@ -119,20 +120,26 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
           });
         }
         if output_count > 0 {
+          if input_count > 0 {
+            ui.separator();
+          }
           ui.vertical(|ui| {
             ui.set_min_width(50.0 * zoom);
             self.outputs_ui(ui, id);
           });
         }
       });
-      self.parameters_ui(ui, id);
+      if param_count > 0 {
+        ui.separator();
+        self.parameters_ui(ui, id);
+      }
     });
   }
 
   #[cfg(feature = "egui")]
   fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
     let mut input_changed = None;
-    for (idx, name) in self.def().inputs.keys().enumerate() {
+    for (idx, (name, _def)) in self.def().inputs.iter().enumerate() {
       let idx = idx as u32;
       ui.horizontal(|ui| {
         let input_key = InputKey::from(idx);
@@ -147,11 +154,16 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
         };
         let input_id = NodeSocketId::input(0, id, idx);
         ui.add(NodeSocket::new(input_id, connected));
-        ui.label(format!("{}", name));
-        if let Some(mut value) = value {
-          if value.ui(ui).changed() {
-            input_changed = Some((input_key, value));
-          }
+        if connected {
+          ui.label(name);
+        } else {
+          ui.collapsing(name, |ui| {
+            if let Some(mut value) = value {
+              if value.ui(ui).changed() {
+                input_changed = Some((input_key, value));
+              }
+            }
+          });
         }
       });
     }

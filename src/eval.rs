@@ -76,7 +76,7 @@ mod tests {
     let reg = NodeRegistry::build();
     println!("Build node graph");
     let mut graph = NodeGraph::new();
-    let scalar = reg.new_by_name("Scalar Math").expect("Scalar Math node");
+    let scalar = reg.new_by_name("F32 Math").expect("F32 Math node");
     let node1 = graph.add(scalar.duplicate());
     graph.set_node_input(node1, "A", 1.0.into())?;
     graph.set_node_input(node1, "B", 2.0.into())?;
@@ -92,7 +92,7 @@ mod tests {
     let mut execution = NodeGraphExecution::new();
     let val = execution.eval_graph(&graph)?;
     println!("eval val={val:?}");
-    assert_eq!(val, Value::Scalar(8.0));
+    assert_eq!(val, Value::F32(8.0));
     Ok(())
   }
 }

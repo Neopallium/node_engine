@@ -11,7 +11,7 @@ fn bench_graph_dynamic_eval(c: &mut Criterion, graphes: &[(usize, NodeGraph, f32
       |b, graph| {
         b.iter(|| {
           let res = execution.eval_graph(&graph).unwrap();
-          assert_eq!(res, Value::Scalar(*expected));
+          assert_eq!(res, Value::F32(*expected));
           res
         })
       },
@@ -46,7 +46,7 @@ fn build_graph(
   max_depth: usize,
   common_input: bool,
 ) -> (usize, NodeGraph, f32, bool) {
-  let scalar = reg.new_by_name("Scalar Math").expect("Scalar math node");
+  let scalar = reg.new_by_name("F32 Math").expect("F32 math node");
   let mut graph = NodeGraph::new();
 
   let input = if common_input {

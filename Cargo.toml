@@ -12,6 +12,8 @@ homepage = "https://github.com/Neopallium/node_engine"
 [features]
 default = ["egui", "math_nodes", "shader_nodes"]
 
+egui = ["dep:egui", "egui_extras"]
+
 math_nodes = []
 shader_nodes = []
 
@@ -24,6 +26,7 @@ thiserror = "1.0"
 
 emath = { version = "0.23", features = ["serde"] }
 egui = { version = "0.23.0", optional = true }
+egui_extras = { version = "0.23.0", optional = true }
 
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1" }
