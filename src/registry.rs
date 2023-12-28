@@ -36,6 +36,10 @@ pub struct NodeFilter {
 }
 
 impl NodeFilter {
+  pub fn matches(&self, name: &str) -> bool {
+    name.to_lowercase().contains(&self.name.to_lowercase())
+  }
+
   #[cfg(feature = "egui")]
   pub fn ui(&mut self, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
@@ -46,9 +50,71 @@ impl NodeFilter {
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
+struct NodeCategory {
+  categories: IndexMap<String, NodeCategory>,
+  nodes: IndexMap<String, Uuid>,
+}
+
+impl NodeCategory {
+  pub fn matches(&self, filter: &NodeFilter) -> bool {
+    for (name, category) in &self.categories {
+      if filter.matches(name) || category.matches(filter) {
+        return true;
+      }
+    }
+    // Render nodes.
+    for (name, _) in &self.nodes {
+      if filter.matches(name) {
+        return true;
+      }
+    }
+    false
+  }
+
+  #[cfg(feature = "egui")]
+  pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<Uuid> {
+    let mut selected_node = None;
+    // Render sub-categories.
+    for (name, category) in &self.categories {
+      if filter.matches(name) || category.matches(filter) {
+        ui.collapsing(name, |ui| {
+          let id = category.ui(ui, filter);
+          if id.is_some() {
+            selected_node = id;
+          }
+        });
+      }
+    }
+    // Render nodes.
+    for (name, id) in &self.nodes {
+      if filter.matches(name) {
+        if ui.button(name).clicked() {
+          selected_node = Some(*id);
+        }
+      }
+    }
+    selected_node
+  }
+
+  fn get_category_mut(&mut self, category: &[String]) -> &mut NodeCategory {
+    if let Some((name, remaining)) = category.split_first() {
+      let category = self.categories.entry(name.to_string()).or_default();
+      category.get_category_mut(remaining)
+    } else {
+      self
+    }
+  }
+
+  fn add_node(&mut self, name: String, id: Uuid) {
+    self.nodes.insert(name, id);
+  }
+}
+
+#[derive(Default, Debug, Serialize, Deserialize)]
 struct NodeRegistryInner {
   nodes: HashMap<Uuid, NodeDefinition>,
   name_to_id: HashMap<String, Uuid>,
+  categories: NodeCategory,
 }
 
 impl NodeRegistryInner {
@@ -57,6 +123,8 @@ impl NodeRegistryInner {
   }
 
   fn register(&mut self, def: &NodeDefinition) -> Option<NodeDefinition> {
+    let category = self.categories.get_category_mut(def.category.as_slice());
+    category.add_node(def.name.clone(), def.uuid);
     self.name_to_id.insert(def.name.clone(), def.uuid);
     self.nodes.insert(def.uuid, def.clone())
   }
@@ -90,13 +158,17 @@ impl NodeRegistryInner {
   pub fn ui(&self, ui: &mut egui::Ui, filter: &NodeFilter) -> Option<Node> {
     let mut selected_node = None;
     ui.group(|ui| {
-      for def in self.nodes.values() {
-        if def.matches(filter) {
-          if ui.button(&def.name).clicked() {
-            selected_node = Some(Node::new(def).expect("Node building shouldn't fail"));
+      selected_node = self
+        .categories
+        .ui(ui, filter)
+        .and_then(|id| self.nodes.get(&id))
+        .and_then(|def| match Node::new(def) {
+          Ok(node) => Some(node),
+          Err(err) => {
+            log::error!("Failed to create node: {err:?}");
+            None
           }
-        }
-      }
+        });
     });
     selected_node
   }
@@ -210,8 +282,9 @@ impl NodeBuilder for NodeBuilderFn {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct NodeDefinition {
   pub name: String,
+  pub package: String,
   pub description: String,
-  pub categories: Vec<String>,
+  pub category: Vec<String>,
   pub uuid: Uuid,
   pub parameters: IndexMap<String, ParameterDefinition>,
   pub inputs: IndexMap<String, InputDefinition>,

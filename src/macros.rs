@@ -525,7 +525,10 @@ macro_rules! impl_node {
           , description: $node_description:literal
         )?
         $(
-          , categories: $node_categories:expr
+          , package: $node_package:expr
+        )?
+        $(
+          , category: $node_category:expr
         )?
         $(
           , custom: {
@@ -568,7 +571,7 @@ macro_rules! impl_node {
           });
           $( def.description = $node_description.to_string(); )?
           $(
-            def.categories = $node_categories.iter().map(|c| c.to_string()).collect();
+            def.category = $node_category.iter().map(|c| c.to_string()).collect();
           )?
           def.inputs = [
             $( InputDefinition::typed::<$field_input_ty>(stringify!($field_input_name)) ),*
@@ -584,9 +587,15 @@ macro_rules! impl_node {
               def.custom.insert(stringify!($custom_field_name).to_string(), $custom_field_value.to_string());
             )*
           )?
+          // Detect crate name and use it as the default `package` name.
+          if let Some(package) = module_path!().split("::").next() {
+            def.package = package.to_string();
+          }
+          $( def.package = $node_package.to_string(); )?
+          // Save source file to help with debugging duplicates (uuid clashes).
           def.source_file = file!().to_string();
 
-          // Set input/output colors
+          // Set custom input/output colors
           $(
             $(
               {
@@ -711,7 +720,7 @@ mod test {
       NodeInfo {
         name: "Test Node",
         description: "Some long description",
-        categories: ["Test"],
+        category: ["Test"],
         // Define some custom fields in the node definition.
         custom: {
           // custom field 1.

@@ -9,7 +9,7 @@ impl_node! {
     NodeInfo {
       name: "Custom external Node",
       description: "Vertex or Fragment UV",
-      categories: ["UV", "Shader"],
+      category: ["External"],
     }
 
     /// The vertex/fragment UV value.

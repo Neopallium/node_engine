@@ -15,7 +15,7 @@ macro_rules! impl_math_node {
         NodeInfo {
           name: $name,
           description: "Simple math node",
-          categories: ["Math"],
+          category: ["Math", "Basic"],
         }
 
         pub enum Op {
@@ -101,7 +101,7 @@ macro_rules! impl_mat_math_node {
         NodeInfo {
           name: $name,
           description: "Simple math node",
-          categories: ["Math"],
+          category: ["Math", "Basic"],
         }
 
         pub enum Op {

@@ -1,15 +1,61 @@
-use glam::{Vec2, Vec4};
+use glam::{Vec2, Vec3, Vec4};
 
 use anyhow::Result;
 
 use crate::*;
 
 impl_node! {
+  mod texture_sample {
+    NodeInfo {
+      name: "Texture Sample",
+      description: "Texture sampler",
+      category: ["Input"],
+    }
+
+    /// Texture node.
+    #[derive(Default)]
+    pub struct TextureNode {
+      /// UV.
+      pub uv: Input<Vec2>,
+      /// Texture. TODO: implement.
+      pub tex: Input<f32>,
+      /// RGB value.
+      pub rgb: Output<Vec3> Color("WHITE"),
+      /// Red value.
+      pub red: Output<f32> Color("RED"),
+      /// Green value.
+      pub green: Output<f32> Color("GREEN"),
+      /// Blue value.
+      pub blue: Output<f32> Color("BLUE"),
+      /// Alpha value.
+      pub alpha: Output<f32> Color("WHITE"),
+      /// RGBA value.
+      pub rgba: Output<Vec4> Color("WHITE"),
+    }
+
+    impl TextureNode {
+      pub fn new() -> Self {
+        Default::default()
+      }
+    }
+
+    impl NodeImpl for TextureNode {
+      fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
+        let block = compile.current_block()?;
+        // TODO: add context lookups.
+        block.append_output(id, "in.uv".to_string());
+        Ok(())
+      }
+    }
+  }
+}
+
+impl_node! {
   mod uv_node {
     NodeInfo {
       name: "UV Node",
       description: "Vertex or Fragment UV",
-      categories: ["UV", "Shader"],
+      category: ["UV"],
     }
 
     /// The vertex/fragment UV value.
@@ -41,7 +87,7 @@ impl_node! {
     NodeInfo {
       name: "Fragment output",
       description: "Fragment shader node",
-      categories: ["UV", "Shader", "Fragment"],
+      category: ["Output"],
     }
 
     /// The fragment shader node.
