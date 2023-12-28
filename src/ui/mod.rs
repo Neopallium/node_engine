@@ -243,7 +243,7 @@ impl egui::Widget for NodeSocket {
     if response.drag_started() {
       ui.set_src_node_socket(id);
     }
-    // HACK: Fix hover during drag.
+    // `hovered()` doesn't work during drag.
     let mut hovered = ui.rect_contains_pointer(rect) || response.hovered();
     if hovered {
       if let Some(src) = ui.get_src_node_socket() {
@@ -268,7 +268,6 @@ impl egui::Widget for NodeSocket {
     let visuals = style.interact_selectable(&response, selected);
     let mut bg_stroke = visuals.bg_stroke;
     bg_stroke.color = color;
-    // HACK: response.hovered() doesn't work during drag.
     if hovered {
       bg_stroke = bg_stroke;
     }

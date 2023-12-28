@@ -6,8 +6,7 @@ use node_engine::*;
 fn main() {
   env_logger::init();
   let native_options = eframe::NativeOptions {
-    viewport: egui::ViewportBuilder::default()
-        .with_inner_size([1000.0, 600.0]),
+    viewport: egui::ViewportBuilder::default().with_inner_size([1000.0, 600.0]),
     ..Default::default()
   };
   eframe::run_native(
