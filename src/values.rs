@@ -66,7 +66,7 @@ impl Value {
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  pub fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     match self {
       Self::I32(v) => v.ui(ui),
       Self::U32(v) => v.ui(ui),
@@ -439,7 +439,7 @@ impl ParameterDefinition {
   #[cfg(feature = "egui")]
   pub fn ui(&self, ui: &mut egui::Ui, value: &mut ParameterValue) -> bool {
     ui.horizontal(|ui| match (&self.param_type, value) {
-      (ParameterDataType::Value(_), ParameterValue::Value(value)) => value.ui(ui).changed(),
+      (ParameterDataType::Value(_), ParameterValue::Value(value)) => value.ui(ui),
       (ParameterDataType::Select(values), ParameterValue::Selected(selected)) => {
         let mut changed = false;
         egui::ComboBox::from_id_source(&self.field_name)

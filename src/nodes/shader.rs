@@ -96,7 +96,7 @@ impl_node! {
     #[derive(Default)]
     pub struct FragmentOutputNode {
       /// Fragment color.
-      pub color: Input<Vec4>,
+      pub color: Input<Color>,
     }
 
     impl FragmentOutputNode {

@@ -2,16 +2,25 @@ use glam::{Vec2, Vec3, Vec4};
 
 use anyhow::{anyhow, Result};
 
+#[cfg(feature = "egui")]
+use egui::color_picker;
+
 use crate::*;
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Color(Vec4);
 
-impl ValueType for Color {
-  fn binding(&self) -> Option<&str> {
-    Some("Color")
+impl Color {
+  pub fn color(&self) -> ecolor::Rgba {
+    ecolor::Rgba::from_rgba_premultiplied(self.0[0], self.0[1], self.0[2], self.0[3])
   }
 
+  pub fn set_color(&mut self, color: ecolor::Rgba) {
+    self.0 = color.to_array().into();
+  }
+}
+
+impl ValueType for Color {
   fn clone_value(&self) -> Box<dyn ValueType> {
     Box::new(self.clone())
   }
@@ -35,8 +44,14 @@ impl ValueType for Color {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    vector_ui(ui, self.0.as_mut())
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    let changed = color_ui(ui, self.0.as_mut());
+    let mut color = self.color();
+    let resp = color_picker::color_edit_button_rgba(ui, &mut color, color_picker::Alpha::BlendOrAdditive);
+    if resp.changed() {
+      self.set_color(color);
+    }
+    changed | resp.changed()
   }
 }
 
@@ -44,10 +59,6 @@ impl ValueType for Color {
 pub struct ColorRGB(Vec3);
 
 impl ValueType for ColorRGB {
-  fn binding(&self) -> Option<&str> {
-    Some("ColorRGB")
-  }
-
   fn clone_value(&self) -> Box<dyn ValueType> {
     Box::new(self.clone())
   }
@@ -71,8 +82,9 @@ impl ValueType for ColorRGB {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    vector_ui(ui, self.0.as_mut())
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    let changed = color_ui(ui, self.0.as_mut());
+    changed | color_picker::color_edit_button_rgb(ui, self.0.as_mut()).changed()
   }
 }
 
@@ -107,7 +119,7 @@ impl ValueType for Bitangent {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     vector_ui(ui, self.0.as_mut())
   }
 }
@@ -143,7 +155,7 @@ impl ValueType for Tangent {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     vector_ui(ui, self.0.as_mut())
   }
 }
@@ -179,7 +191,7 @@ impl ValueType for Normal {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     vector_ui(ui, self.0.as_mut())
   }
 }
@@ -215,7 +227,7 @@ impl ValueType for Position {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     vector_ui(ui, self.0.as_mut())
   }
 }
@@ -266,7 +278,7 @@ impl ValueType for UV {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     egui::ComboBox::from_id_source("UV Channel")
       .selected_text(format!("{:?}", self.1))
       .show_ui(ui, |ui| {
@@ -275,6 +287,6 @@ impl ValueType for UV {
         ui.selectable_value(&mut self.1, UvChannel::UV2, "UV2");
         ui.selectable_value(&mut self.1, UvChannel::UV3, "UV3");
       })
-      .response
+      .response.changed()
   }
 }

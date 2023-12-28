@@ -101,8 +101,9 @@ pub trait ValueType: core::fmt::Debug {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    ui.label("No UI for type.")
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.label("No UI for type.");
+    false
   }
 }
 
@@ -136,8 +137,8 @@ impl ValueType for i32 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    ui.add(egui::DragValue::new(self).speed(1))
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.add(egui::DragValue::new(self).speed(1)).changed()
   }
 }
 
@@ -165,8 +166,8 @@ impl ValueType for u32 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    ui.add(egui::DragValue::new(self).speed(1))
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.add(egui::DragValue::new(self).speed(1)).changed()
   }
 }
 
@@ -194,13 +195,15 @@ impl ValueType for f32 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    ui.add(egui::DragValue::new(self).speed(0.1))
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.add(egui::DragValue::new(self).speed(0.1)).changed()
   }
 }
 
 #[cfg(feature = "egui")]
 const COLUMNS: [&str; 4] = ["X", "Y", "Z", "W"];
+#[cfg(feature = "egui")]
+const COLOR_COLUMNS: [&str; 4] = ["R", "G", "B", "A"];
 
 #[cfg(feature = "egui")]
 pub(crate) fn f32_table_ui(
@@ -208,11 +211,12 @@ pub(crate) fn f32_table_ui(
   columns: &[&str],
   rows: usize,
   values: &mut [f32],
-) -> egui::Response {
+  range: Option<(f32, f32)>,
+) -> bool {
   use egui_extras::{Column, TableBuilder};
 
   let node_style = ui.node_style();
-  let mut resp = ui.interact(ui.min_rect(), ui.id(), egui::Sense::click());
+  let mut changed = false;
   let height = 20.0 * node_style.zoom;
   let width = 40.0 * node_style.zoom;
 
@@ -235,26 +239,40 @@ pub(crate) fn f32_table_ui(
         body.rows(height, rows, |row_index, mut row| {
           for col in 0..columns.len() {
             row.col(|ui| {
-              if values[col * rows + row_index].ui(ui).changed() {
-                resp.mark_changed();
+              let val = &mut values[col * rows + row_index];
+              let drag = if let Some((min, max)) = range {
+                egui::DragValue::new(val)
+                  .speed(0.1)
+                  .clamp_range(min..=max)
+              } else {
+                egui::DragValue::new(val).speed(0.1)
+              };
+              if ui.add(drag).changed() {
+                changed = true;
               }
             });
           }
         });
       });
   });
-  resp
+  changed
 }
 
 #[cfg(feature = "egui")]
-pub(crate) fn vector_ui(ui: &mut egui::Ui, values: &mut [f32]) -> egui::Response {
+pub(crate) fn vector_ui(ui: &mut egui::Ui, values: &mut [f32]) -> bool {
   let len = values.len();
-  f32_table_ui(ui, &COLUMNS[0..len], 1, values)
+  f32_table_ui(ui, &COLUMNS[0..len], 1, values, None)
 }
 
 #[cfg(feature = "egui")]
-pub(crate) fn matrix_ui(ui: &mut egui::Ui, dim: usize, values: &mut [f32]) -> egui::Response {
-  f32_table_ui(ui, &COLUMNS[0..dim], dim, values)
+pub(crate) fn color_ui(ui: &mut egui::Ui, values: &mut [f32]) -> bool {
+  let len = values.len();
+  f32_table_ui(ui, &COLOR_COLUMNS[0..len], 1, values, Some((0., 1.)))
+}
+
+#[cfg(feature = "egui")]
+pub(crate) fn matrix_ui(ui: &mut egui::Ui, dim: usize, values: &mut [f32]) -> bool {
+  f32_table_ui(ui, &COLUMNS[0..dim], dim, values, None)
 }
 
 impl ValueType for Vec2 {
@@ -281,7 +299,7 @@ impl ValueType for Vec2 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     vector_ui(ui, self.as_mut())
   }
 }
@@ -310,7 +328,7 @@ impl ValueType for Vec3 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     vector_ui(ui, self.as_mut())
   }
 }
@@ -339,7 +357,7 @@ impl ValueType for Vec4 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     vector_ui(ui, self.as_mut())
   }
 }
@@ -368,7 +386,7 @@ impl ValueType for Mat2 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     matrix_ui(ui, 2, &mut self.as_mut()[..])
   }
 }
@@ -397,7 +415,7 @@ impl ValueType for Mat3 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     matrix_ui(ui, 3, &mut self.as_mut()[..])
   }
 }
@@ -426,7 +444,7 @@ impl ValueType for Mat4 {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     matrix_ui(ui, 4, &mut self.as_mut()[..])
   }
 }

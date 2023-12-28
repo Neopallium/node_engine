@@ -159,7 +159,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
         } else {
           ui.collapsing(name, |ui| {
             if let Some(mut value) = value {
-              if value.ui(ui).changed() {
+              if value.ui(ui) {
                 input_changed = Some((input_key, value));
               }
             }
