@@ -40,7 +40,7 @@ impl From<&str> for InputKey {
   }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug)]
 pub enum Input {
   Disconnect,
   Connect(OutputId, Option<DataType>),
@@ -79,22 +79,15 @@ impl<T: ValueType> InputTyped<T> {
 
   pub fn as_input(&self) -> Input {
     match &self.connected {
-      Some(id) => Input::Connect(*id, Some(T::data_type())),
+      Some(id) => Input::Connect(*id, Some(self.value.data_type())),
       None => Input::Value(self.value.to_value()),
-    }
-  }
-
-  pub fn eval(&self, graph: &NodeGraph, execution: &mut NodeGraphExecution) -> Result<T> {
-    match &self.connected {
-      Some(OutputId { node: id, .. }) => T::from_value(execution.eval_node(graph, *id)?),
-      None => self.value.eval(graph, execution),
     }
   }
 
   pub fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile) -> Result<String> {
     match &self.connected {
       Some(OutputId { node: id, .. }) => compile.resolve_node(graph, *id),
-      None => self.value.compile(graph, compile),
+      None => compile.compile_value(&self.value.to_value()),
     }
   }
 
@@ -103,11 +96,11 @@ impl<T: ValueType> InputTyped<T> {
     match input {
       Input::Disconnect => (),
       Input::Value(val) => {
-        self.value = T::from_value(val)?;
+        self.value.set_value(val)?;
       }
       Input::Connect(id, dt) => {
         if let Some(output_dt) = dt {
-          if !T::data_type().is_compatible(&output_dt) {
+          if !self.value.data_type().is_compatible(&output_dt) {
             return Err(anyhow!("Incompatible output"));
           }
         }
@@ -121,7 +114,7 @@ impl<T: ValueType> InputTyped<T> {
   pub fn ui(&mut self, idx: u32, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) {
     ui.horizontal(|ui| {
       let connected = self.is_connected();
-      let input_id = NodeSocketId::input(0, id, idx, T::data_type());
+      let input_id = NodeSocketId::input(0, id, idx, self.value.data_type());
       ui.add(NodeSocket::new(input_id, connected, def.color));
       if connected {
         ui.label(&def.name);
@@ -131,5 +124,18 @@ impl<T: ValueType> InputTyped<T> {
         });
       }
     });
+  }
+}
+
+impl<T: ValueType + Clone + Default> InputTyped<T> {
+  pub fn eval(&self, graph: &NodeGraph, execution: &mut NodeGraphExecution) -> Result<T> {
+    match &self.connected {
+      Some(OutputId { node: id, .. }) => {
+        let mut val = T::default();
+        val.set_value(execution.eval_node(graph, *id)?)?;
+        Ok(val)
+      },
+      None => Ok(self.value.clone()),
+    }
   }
 }

@@ -46,7 +46,7 @@ fn build_graph(
   max_depth: usize,
   common_input: bool,
 ) -> (usize, NodeGraph, f32, bool) {
-  let scalar = reg.new_by_name("F32 Math").expect("F32 math node");
+  let scalar = reg.new_by_name("Scalar Math").expect("Scalar math node");
   let mut graph = NodeGraph::new();
 
   let input = if common_input {

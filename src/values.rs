@@ -193,8 +193,9 @@ pub struct InputDefinition {
 }
 
 impl InputDefinition {
-  pub fn typed<T: ValueType>(field_name: &str) -> (String, Self) {
-    Self::new(field_name, T::data_type())
+  pub fn typed<T: ValueType + Default>(field_name: &str) -> (String, Self) {
+    let val = T::default();
+    Self::new(field_name, val.data_type())
   }
 
   pub fn new(field_name: &str, value_type: DataType) -> (String, Self) {
@@ -246,8 +247,9 @@ pub struct OutputDefinition {
 }
 
 impl OutputDefinition {
-  pub fn typed<T: ValueType>(field_name: &str) -> (String, Self) {
-    Self::new(field_name, T::data_type())
+  pub fn typed<T: ValueType + Default>(field_name: &str) -> (String, Self) {
+    let val = T::default();
+    Self::new(field_name, val.data_type())
   }
 
   pub fn new(field_name: &str, value_type: DataType) -> (String, Self) {
@@ -344,7 +346,7 @@ pub trait ParameterType {
 
 impl<T> ParameterType for T
 where
-  T: ValueType,
+  T: ValueType + Default,
 {
   fn get_param(&self) -> ParameterValue {
     ParameterValue::Value(self.to_value())
@@ -353,7 +355,7 @@ where
   fn set_param(&mut self, value: ParameterValue) -> Result<()> {
     match value {
       ParameterValue::Value(val) => {
-        *self = T::from_value(val)?;
+        self.set_value(val)?;
         Ok(())
       }
       _ => Err(anyhow!("Unsupport ParameterValue -> Value conversion.")),
@@ -361,7 +363,8 @@ where
   }
 
   fn parameter_data_type() -> ParameterDataType {
-    ParameterDataType::Value(T::data_type())
+    let val = T::default();
+    ParameterDataType::Value(val.data_type())
   }
 }
 
@@ -468,12 +471,12 @@ pub struct OutputTyped<T> {
 }
 
 #[cfg(feature = "egui")]
-impl<T: ValueType> OutputTyped<T> {
+impl<T: ValueType + Default> OutputTyped<T> {
   #[cfg(feature = "egui")]
   pub fn ui(&mut self, idx: u32, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
     ui.horizontal(|ui| {
       ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let output_id = NodeSocketId::output(0, id, idx, T::data_type());
+        let output_id = NodeSocketId::output(0, id, idx, T::default().data_type());
         ui.add(NodeSocket::new(output_id, false, def.color));
         ui.label(&def.name);
       });

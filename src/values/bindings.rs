@@ -12,18 +12,25 @@ impl ValueType for Color {
     Some("Color")
   }
 
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec4(self.0)
   }
 
-  fn from_value(value: Value) -> Result<Self> {
+  fn set_value(&mut self, value: Value) -> Result<()> {
     match value {
-      Value::Vec4(v) => Ok(Self(v)),
+      Value::Vec4(v) => {
+        *self = Self(v);
+        Ok(())
+      }
       _ => Err(anyhow!("Expected a Vec4 (Color) got: {value:?}")),
     }
   }
 
-  fn data_type() -> DataType {
+  fn data_type(&self) -> DataType {
     DataType::Vec4
   }
 
@@ -41,18 +48,25 @@ impl ValueType for ColorRGB {
     Some("ColorRGB")
   }
 
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
 
-  fn from_value(value: Value) -> Result<Self> {
+  fn set_value(&mut self, value: Value) -> Result<()> {
     match value {
-      Value::Vec3(v) => Ok(Self(v)),
+      Value::Vec3(v) => {
+        *self = Self(v);
+        Ok(())
+      }
       _ => Err(anyhow!("Expected a Vec3 (ColorRGB) got: {value:?}")),
     }
   }
 
-  fn data_type() -> DataType {
+  fn data_type(&self) -> DataType {
     DataType::Vec3
   }
 
@@ -70,18 +84,25 @@ impl ValueType for Bitangent {
     Some("Bitangent")
   }
 
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
 
-  fn from_value(value: Value) -> Result<Self> {
+  fn set_value(&mut self, value: Value) -> Result<()> {
     match value {
-      Value::Vec3(v) => Ok(Self(v)),
+      Value::Vec3(v) => {
+        *self = Self(v);
+        Ok(())
+      }
       _ => Err(anyhow!("Expected a Vec3 (Bitangent) got: {value:?}")),
     }
   }
 
-  fn data_type() -> DataType {
+  fn data_type(&self) -> DataType {
     DataType::Vec3
   }
 
@@ -99,18 +120,25 @@ impl ValueType for Tangent {
     Some("Tangent")
   }
 
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
 
-  fn from_value(value: Value) -> Result<Self> {
+  fn set_value(&mut self, value: Value) -> Result<()> {
     match value {
-      Value::Vec3(v) => Ok(Self(v)),
+      Value::Vec3(v) => {
+        *self = Self(v);
+        Ok(())
+      }
       _ => Err(anyhow!("Expected a Vec3 (Tangent) got: {value:?}")),
     }
   }
 
-  fn data_type() -> DataType {
+  fn data_type(&self) -> DataType {
     DataType::Vec3
   }
 
@@ -128,18 +156,25 @@ impl ValueType for Normal {
     Some("Normal")
   }
 
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
 
-  fn from_value(value: Value) -> Result<Self> {
+  fn set_value(&mut self, value: Value) -> Result<()> {
     match value {
-      Value::Vec3(v) => Ok(Self(v)),
+      Value::Vec3(v) => {
+        *self = Self(v);
+        Ok(())
+      }
       _ => Err(anyhow!("Expected a Vec3 (Normal) got: {value:?}")),
     }
   }
 
-  fn data_type() -> DataType {
+  fn data_type(&self) -> DataType {
     DataType::Vec3
   }
 
@@ -157,18 +192,25 @@ impl ValueType for Position {
     Some("Position")
   }
 
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
 
-  fn from_value(value: Value) -> Result<Self> {
+  fn set_value(&mut self, value: Value) -> Result<()> {
     match value {
-      Value::Vec3(v) => Ok(Self(v)),
+      Value::Vec3(v) => {
+        *self = Self(v);
+        Ok(())
+      }
       _ => Err(anyhow!("Expected a Vec3 (Position) got: {value:?}")),
     }
   }
 
-  fn data_type() -> DataType {
+  fn data_type(&self) -> DataType {
     DataType::Vec3
   }
 
@@ -201,18 +243,25 @@ impl ValueType for UV {
     }
   }
 
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec2(self.0)
   }
 
-  fn from_value(value: Value) -> Result<Self> {
+  fn set_value(&mut self, value: Value) -> Result<()> {
     match value {
-      Value::Vec2(v) => Ok(Self(v, Default::default())),
+      Value::Vec2(v) => {
+        *self = Self(v, Default::default());
+        Ok(())
+      }
       _ => Err(anyhow!("Expected a Vec2 (UV) got: {value:?}")),
     }
   }
 
-  fn data_type() -> DataType {
+  fn data_type(&self) -> DataType {
     DataType::Vec2
   }
 
