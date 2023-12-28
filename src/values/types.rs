@@ -88,7 +88,7 @@ impl DataType {
 }
 
 pub trait ValueType: Clone {
-  fn has_binding(&self) -> Option<&str> {
+  fn binding(&self) -> Option<&str> {
     None
   }
 

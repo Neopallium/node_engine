@@ -16,7 +16,7 @@ impl_node! {
     #[derive(Default)]
     pub struct TextureNode {
       /// UV.
-      pub uv: Input<Vec2>,
+      pub uv: Input<UV>,
       /// Texture. TODO: implement.
       pub tex: Input<f32>,
       /// RGB value.

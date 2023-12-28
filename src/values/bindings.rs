@@ -8,6 +8,10 @@ use crate::*;
 pub struct Color(Vec4);
 
 impl ValueType for Color {
+  fn binding(&self) -> Option<&str> {
+    Some("Color")
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec4(self.0)
   }
@@ -33,6 +37,10 @@ impl ValueType for Color {
 pub struct ColorRGB(Vec3);
 
 impl ValueType for ColorRGB {
+  fn binding(&self) -> Option<&str> {
+    Some("ColorRGB")
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
@@ -58,6 +66,10 @@ impl ValueType for ColorRGB {
 pub struct Bitangent(Vec3);
 
 impl ValueType for Bitangent {
+  fn binding(&self) -> Option<&str> {
+    Some("Bitangent")
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
@@ -83,6 +95,10 @@ impl ValueType for Bitangent {
 pub struct Tangent(Vec3);
 
 impl ValueType for Tangent {
+  fn binding(&self) -> Option<&str> {
+    Some("Tangent")
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
@@ -108,6 +124,10 @@ impl ValueType for Tangent {
 pub struct Normal(Vec3);
 
 impl ValueType for Normal {
+  fn binding(&self) -> Option<&str> {
+    Some("Normal")
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
@@ -133,6 +153,10 @@ impl ValueType for Normal {
 pub struct Position(Vec3);
 
 impl ValueType for Position {
+  fn binding(&self) -> Option<&str> {
+    Some("Position")
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec3(self.0)
   }
@@ -154,7 +178,7 @@ impl ValueType for Position {
   }
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum UvChannel {
   #[default]
   UV0,
@@ -167,6 +191,15 @@ pub enum UvChannel {
 pub struct UV(Vec2, UvChannel);
 
 impl ValueType for UV {
+  fn binding(&self) -> Option<&str> {
+    match self.1 {
+      UvChannel::UV0 => Some("UV0"),
+      UvChannel::UV1 => Some("UV1"),
+      UvChannel::UV2 => Some("UV2"),
+      UvChannel::UV3 => Some("UV3"),
+    }
+  }
+
   fn to_value(&self) -> Value {
     Value::Vec2(self.0)
   }
@@ -184,6 +217,14 @@ impl ValueType for UV {
 
   #[cfg(feature = "egui")]
   fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-    vector_ui(ui, self.0.as_mut())
+    egui::ComboBox::from_id_source("UV Channel")
+      .selected_text(format!("{:?}", self.1))
+      .show_ui(ui, |ui| {
+        ui.selectable_value(&mut self.1, UvChannel::UV0, "UV0");
+        ui.selectable_value(&mut self.1, UvChannel::UV1, "UV1");
+        ui.selectable_value(&mut self.1, UvChannel::UV2, "UV2");
+        ui.selectable_value(&mut self.1, UvChannel::UV3, "UV3");
+      })
+      .response
   }
 }
