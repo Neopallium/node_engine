@@ -58,18 +58,11 @@ impl_node! {
       category: ["UV"],
     }
 
-    pub enum Channel {
-      UV0,
-      UV1,
-      UV2,
-      UV3,
-    }
-
     /// The vertex/fragment UV value.
     #[derive(Default)]
     pub struct UVNode {
       /// UV Channel.
-      pub channel: Param<Channel>,
+      pub channel: Param<UvChannel>,
       /// UV value.
       pub uv: Output<Vec2>,
     }

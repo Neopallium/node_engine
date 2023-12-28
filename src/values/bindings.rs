@@ -178,14 +178,15 @@ impl ValueType for Position {
   }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum UvChannel {
-  #[default]
-  UV0,
-  UV1,
-  UV2,
-  UV3,
-}
+impl_enum_parameter_type!(
+  #[derive(PartialEq, Eq)]
+  pub enum UvChannel {
+    UV0,
+    UV1,
+    UV2,
+    UV3,
+  }
+);
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct UV(Vec2, UvChannel);

@@ -1,4 +1,58 @@
 #[macro_export]
+macro_rules! impl_enum_parameter_type {
+  // Parse Parameter enum types.
+  ($(#[$param_enum_meta:meta])*
+  pub enum $param_enum_name:ident {
+    $(
+      $(#[$variant_meta:meta])*
+      $variant_name:ident
+    ),+ $(,)?
+  }) => {
+    $(#[$param_enum_meta])*
+    #[derive(Copy, Clone, Debug, Default)]
+    #[derive(serde::Serialize, serde::Deserialize)]
+    pub enum $param_enum_name {
+      #[default]
+      $(
+        $(#[$variant_meta])*
+        $variant_name
+      ),+
+    }
+
+    impl ParameterType for $param_enum_name {
+      fn get_param(&self) -> ParameterValue {
+        ParameterValue::Selected(format!("{self:?}"))
+      }
+
+      fn set_param(&mut self, value: ParameterValue) -> Result<()> {
+        match value {
+          ParameterValue::Selected(val) => match val.as_str() {
+            $(
+              stringify!($variant_name) => {
+                *self = Self::$variant_name;
+                Ok(())
+              }
+            ),+
+            _ => Err(anyhow::anyhow!("Invalid {val} variant."))
+          }
+          _ => {
+            Err(anyhow::anyhow!("Unsupport ParameterValue -> Enum conversion."))
+          }
+        }
+      }
+
+      fn parameter_data_type() -> ParameterDataType {
+        ParameterDataType::select(&[
+          $(
+            stringify!($variant_name)
+          ),+
+        ])
+      }
+    }
+  }
+}
+
+#[macro_export]
 macro_rules! impl_node {
   (
     mod $mod_name:ident {
@@ -69,10 +123,7 @@ macro_rules! impl_node {
       { $( $node_trait_impl:tt )* }
       $(#[$param_enum_meta:meta])*
       pub enum $param_enum_name:ident {
-        $(
-          $(#[$variant_meta:meta])*
-          $variant_name:ident
-        ),+ $(,)?
+        $($param_enum_fields:tt)*
       }
       $($rest:tt)*
     }
@@ -84,47 +135,12 @@ macro_rules! impl_node {
         {
           $( $extra_code )*
 
-          $(#[$param_enum_meta])*
-          #[derive(Copy, Clone, Debug, Default)]
-          #[derive(serde::Serialize, serde::Deserialize)]
-          pub enum $param_enum_name {
-            #[default]
-            $(
-              $(#[$variant_meta])*
-              $variant_name
-            ),+
-          }
-
-          impl ParameterType for $param_enum_name {
-            fn get_param(&self) -> ParameterValue {
-              ParameterValue::Selected(format!("{self:?}"))
+          $crate::impl_enum_parameter_type!(
+            $(#[$param_enum_meta])*
+            pub enum $param_enum_name {
+              $($param_enum_fields)*
             }
-
-            fn set_param(&mut self, value: ParameterValue) -> Result<()> {
-              match value {
-                ParameterValue::Selected(val) => match val.as_str() {
-                  $(
-                    stringify!($variant_name) => {
-                      *self = Self::$variant_name;
-                      Ok(())
-                    }
-                  ),+
-                  _ => Err(anyhow::anyhow!("Invalid {val} variant."))
-                }
-                _ => {
-                  Err(anyhow::anyhow!("Unsupport ParameterValue -> Enum conversion."))
-                }
-              }
-            }
-
-            fn parameter_data_type() -> ParameterDataType {
-              ParameterDataType::select(&[
-                $(
-                  stringify!($variant_name)
-                ),+
-              ])
-            }
-          }
+          );
         }
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
