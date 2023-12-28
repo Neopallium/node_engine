@@ -54,7 +54,13 @@ pub trait NodeGraphAccess {
 
   fn get_dropped_node_sockets(&mut self) -> Option<(NodeSocketId, Option<NodeSocketId>)>;
 
-  fn update_node_socket(&mut self, id: NodeSocketId, pos: egui::Pos2, dt: DataType);
+  fn update_node_socket(
+    &mut self,
+    id: NodeSocketId,
+    pos: egui::Pos2,
+    dt: DataType,
+    color: egui::Color32,
+  );
 
   fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2;
 
@@ -100,7 +106,13 @@ impl NodeGraphAccess for egui::Ui {
     })
   }
 
-  fn update_node_socket(&mut self, id: NodeSocketId, pos: egui::Pos2, dt: DataType) {
+  fn update_node_socket(
+    &mut self,
+    id: NodeSocketId,
+    pos: egui::Pos2,
+    dt: DataType,
+    color: egui::Color32,
+  ) {
     self.data_mut(|d| {
       let graph = d
         .get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META))
@@ -108,6 +120,7 @@ impl NodeGraphAccess for egui::Ui {
       let meta = d.get_temp_mut_or_default::<NodeSocketMeta>(id.ui_id());
       meta.center = graph.ui_to_graph(pos);
       meta.dt = dt;
+      meta.color = color;
     });
   }
 
@@ -163,6 +176,7 @@ impl NodeGraphMeta {
 pub struct NodeSocketMeta {
   pub center: egui::Vec2,
   pub dt: DataType,
+  pub color: egui::Color32,
 }
 
 impl Default for NodeSocketMeta {
@@ -170,34 +184,45 @@ impl Default for NodeSocketMeta {
     Self {
       center: Default::default(),
       dt: DataType::F32,
+      color: Default::default(),
     }
   }
 }
 
 impl NodeSocketMeta {
   pub fn color(&self) -> egui::Color32 {
-    self.dt.color()
+    self.color
   }
 }
 
 pub struct NodeSocket {
   id: NodeSocketId,
   connected: bool,
+  color: Option<egui::Color32>,
 }
 
 impl NodeSocket {
-  pub fn new(id: NodeSocketId, connected: bool) -> Self {
-    Self { id, connected }
+  pub fn new(id: NodeSocketId, connected: bool, color: Option<egui::Color32>) -> Self {
+    Self {
+      id,
+      connected,
+      color,
+    }
   }
 
   pub fn color(&self) -> egui::Color32 {
-    self.id.color()
+    if let Some(color) = &self.color {
+      *color
+    } else {
+      self.id.color()
+    }
   }
 }
 
 impl egui::Widget for NodeSocket {
   fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-    let Self { id, connected } = self;
+    let color = self.color();
+    let Self { id, connected, .. } = self;
 
     // 1. Deciding widget size:
     let spacing = &ui.spacing();
@@ -212,8 +237,7 @@ impl egui::Widget for NodeSocket {
     let center = small_icon_rect.center();
 
     // Update socket metadata.
-    let color = self.color();
-    ui.update_node_socket(id, center, self.id.data_type());
+    ui.update_node_socket(id, center, self.id.data_type(), color);
 
     // 3. Interact: Time to check for clicks!
     if response.drag_started() {

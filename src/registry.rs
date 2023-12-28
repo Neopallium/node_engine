@@ -259,6 +259,18 @@ impl NodeDefinition {
     self.inputs.iter()
   }
 
+  pub fn set_input_color(&mut self, name: &str, color: Option<&str>) {
+    if let Some(input) = self.inputs.get_mut(name) {
+      input.set_color(color);
+    }
+  }
+
+  pub fn set_output_color(&mut self, name: &str, color: Option<&str>) {
+    if let Some(output) = self.outputs.get_mut(name) {
+      output.set_color(color);
+    }
+  }
+
   pub fn outputs(&self) -> impl Iterator<Item = (&String, &OutputDefinition)> {
     self.outputs.iter()
   }

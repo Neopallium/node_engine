@@ -1864,6 +1864,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "criterion",
+ "ecolor",
  "eframe",
  "egui",
  "egui_extras",
@@ -1872,6 +1873,7 @@ dependencies = [
  "erased-serde",
  "glam",
  "heck",
+ "hex",
  "indexmap",
  "inventory",
  "lazy_static",

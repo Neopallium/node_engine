@@ -153,7 +153,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
           }
         };
         let input_id = NodeSocketId::input(0, id, idx, def.value_type);
-        ui.add(NodeSocket::new(input_id, connected));
+        ui.add(NodeSocket::new(input_id, connected, def.color));
         if connected {
           ui.label(name);
         } else {
@@ -206,7 +206,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
           let connected = false;
           let output_id = NodeSocketId::output(0, id, idx as _, def.value_type);
-          ui.add(NodeSocket::new(output_id, connected));
+          ui.add(NodeSocket::new(output_id, connected, def.color));
           ui.label(format!("{}", name));
         });
       });

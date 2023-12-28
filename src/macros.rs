@@ -192,7 +192,7 @@ macro_rules! impl_node {
       { $( $node_trait_impl:tt )* }
       ___internal_parse_fields {
           $( #[$field_meta:meta] )*
-          $field_vis:vis $field_name:ident : Input<$field_ty:ident>,
+          $field_vis:vis $field_name:ident : Input<$field_ty:ident> $(Color($color:literal))?,
           $($unparsed_fields:tt)*
       }
       $($rest:tt)*
@@ -205,7 +205,7 @@ macro_rules! impl_node {
         { $( $extra_code )* }
         [
           $( $node_inputs )*
-          $field_name : $field_ty,
+          $field_name : $field_ty $(Color($color))?,
         ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
@@ -284,7 +284,7 @@ macro_rules! impl_node {
       { $( $node_trait_impl:tt )* }
       ___internal_parse_fields {
           $( #[$field_meta:meta] )*
-          $field_vis:vis $field_name:ident : Output<$field_ty:ident>,
+          $field_vis:vis $field_name:ident : Output<$field_ty:ident> $(Color($color:literal))?,
           $($unparsed_fields:tt)*
       }
       $($rest:tt)*
@@ -299,7 +299,7 @@ macro_rules! impl_node {
         [ $( $node_parameters )* ]
         [
           $( $node_outputs )*
-          $field_name : $field_ty,
+          $field_name : $field_ty $(Color($color))?,
         ]
         [
           $( $node_struct_fields )*
@@ -536,9 +536,9 @@ macro_rules! impl_node {
         $(,)?
       }
       { $( $extra_code:tt )* }
-      [ $( $field_input_name:ident: $field_input_ty:ident, )* ]
+      [ $( $field_input_name:ident: $field_input_ty:ident $(Color($field_input_color:literal))?,)* ]
       [ $( $field_param_name:ident: $field_param_ty:ident, )* ]
-      [ $( $field_output_name:ident: $field_output_ty:ident, )* ]
+      [ $( $field_output_name:ident: $field_output_ty:ident $(Color($field_output_color:literal))?, )* ]
       [ $( $node_struct_fields:tt )* ]
       {
         $(#[$node_struct_attr:meta])*
@@ -586,6 +586,25 @@ macro_rules! impl_node {
           )?
           def.source_file = file!().to_string();
 
+          // Set input/output colors
+          $(
+            $(
+              {
+                use heck::ToTitleCase;
+                let name = stringify!($field_input_name).to_title_case();
+                def.set_input_color(&name, Some($field_input_color));
+              }
+            )?
+          )*
+          $(
+            $(
+              {
+                use heck::ToTitleCase;
+                let name = stringify!($field_output_name).to_title_case();
+                def.set_output_color(&name, Some($field_output_color));
+              }
+            )?
+          )*
           def
         };
       }
