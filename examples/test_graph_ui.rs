@@ -6,7 +6,8 @@ use node_engine::*;
 fn main() {
   env_logger::init();
   let native_options = eframe::NativeOptions {
-    initial_window_size: Some(egui::vec2(1000., 600.)),
+    viewport: egui::ViewportBuilder::default()
+        .with_inner_size([1000.0, 600.0]),
     ..Default::default()
   };
   eframe::run_native(
@@ -18,7 +19,7 @@ fn main() {
 }
 
 const X_OFFSET: f32 = 400.0;
-const Y_OFFSET: f32 = 50.0;
+const Y_OFFSET: f32 = 60.0;
 
 fn build_sub_graph(
   node: &Node,
@@ -98,9 +99,9 @@ impl eframe::App for MyEguiApp {
     }
   }
 
-  fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+  fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
-      frame.close();
+      ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
     self.editor.show(ctx);
   }
