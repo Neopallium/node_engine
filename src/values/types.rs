@@ -92,10 +92,6 @@ pub trait ValueType: Clone {
     None
   }
 
-  fn as_input(&self) -> Input {
-    Input::Value(self.to_value())
-  }
-
   fn to_value(&self) -> Value;
 
   fn from_value(value: Value) -> Result<Self>;

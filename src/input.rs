@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
 
+#[cfg(feature = "egui")]
+use crate::ui::*;
 use crate::*;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -78,7 +80,7 @@ impl<T: ValueType> InputTyped<T> {
   pub fn as_input(&self) -> Input {
     match &self.connected {
       Some(id) => Input::Connect(*id, Some(T::data_type())),
-      None => self.value.as_input(),
+      None => Input::Value(self.value.to_value()),
     }
   }
 
@@ -113,5 +115,21 @@ impl<T: ValueType> InputTyped<T> {
       }
     }
     Ok(old)
+  }
+
+  #[cfg(feature = "egui")]
+  pub fn ui(&mut self, idx: u32, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) {
+    ui.horizontal(|ui| {
+      let connected = self.is_connected();
+      let input_id = NodeSocketId::input(0, id, idx, T::data_type());
+      ui.add(NodeSocket::new(input_id, connected, def.color));
+      if connected {
+        ui.label(&def.name);
+      } else {
+        ui.collapsing(&def.name, |ui| {
+          self.value.ui(ui);
+        });
+      }
+    });
   }
 }

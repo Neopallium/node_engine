@@ -7,6 +7,8 @@ use glam::{Mat2, Mat3, Mat4, Vec2, Vec3, Vec4};
 
 use anyhow::{anyhow, Result};
 
+#[cfg(feature = "egui")]
+use crate::ui::*;
 use crate::*;
 
 pub mod types;
@@ -184,6 +186,7 @@ pub fn decode_color(color: Option<&str>) -> Option<ecolor::Color32> {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InputDefinition {
+  pub name: String,
   pub field_name: String,
   pub value_type: DataType,
   pub color: Option<ecolor::Color32>,
@@ -195,9 +198,11 @@ impl InputDefinition {
   }
 
   pub fn new(field_name: &str, value_type: DataType) -> (String, Self) {
+    let name = field_name.to_title_case();
     (
-      field_name.to_title_case(),
+      name.clone(),
       Self {
+        name,
         field_name: field_name.to_string(),
         value_type,
         color: None,
@@ -234,6 +239,7 @@ impl InputDefinition {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct OutputDefinition {
+  pub name: String,
   pub field_name: String,
   pub value_type: DataType,
   pub color: Option<ecolor::Color32>,
@@ -245,9 +251,11 @@ impl OutputDefinition {
   }
 
   pub fn new(field_name: &str, value_type: DataType) -> (String, Self) {
+    let name = field_name.to_title_case();
     (
-      field_name.to_title_case(),
+      name.clone(),
       Self {
+        name,
         field_name: field_name.to_string(),
         value_type,
         color: None,
@@ -319,6 +327,19 @@ pub trait ParameterType {
   fn set_param(&mut self, value: ParameterValue) -> Result<()>;
 
   fn parameter_data_type() -> ParameterDataType;
+
+  #[cfg(feature = "egui")]
+  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId) {
+    ui.horizontal(|ui| {
+      let mut value = self.get_param();
+      ui.label(&def.name);
+      if def.ui(ui, &mut value) {
+        if let Err(err) = self.set_param(value) {
+          log::error!("Failed to update node parameter: {err:?}");
+        }
+      }
+    });
+  }
 }
 
 impl<T> ParameterType for T
@@ -346,6 +367,7 @@ where
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ParameterDefinition {
+  pub name: String,
   pub field_name: String,
   pub param_type: ParameterDataType,
 }
@@ -356,9 +378,11 @@ impl ParameterDefinition {
   }
 
   pub fn new(field_name: &str, param_type: ParameterDataType) -> (String, Self) {
+    let name = field_name.to_title_case();
     (
-      field_name.to_title_case(),
+      name.clone(),
       Self {
+        name,
         field_name: field_name.to_string(),
         param_type,
       },
@@ -441,4 +465,18 @@ impl ParameterDefinition {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct OutputTyped<T> {
   _phantom: core::marker::PhantomData<T>,
+}
+
+#[cfg(feature = "egui")]
+impl<T: ValueType> OutputTyped<T> {
+  #[cfg(feature = "egui")]
+  pub fn ui(&mut self, idx: u32, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
+    ui.horizontal(|ui| {
+      ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        let output_id = NodeSocketId::output(0, id, idx, T::data_type());
+        ui.add(NodeSocket::new(output_id, false, def.color));
+        ui.label(&def.name);
+      });
+    });
+  }
 }
