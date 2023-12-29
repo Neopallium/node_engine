@@ -207,9 +207,24 @@ impl<'de> Deserialize<'de> for ConnectionMap {
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
+pub struct NodeGraphProperty {
+  id: Uuid,
+  name: String,
+  description: String,
+  value: Value,
+}
+
+impl GetId for NodeGraphProperty {
+  fn id(&self) -> Uuid {
+    self.id
+  }
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
   id: Uuid,
   editor: EditorState,
+  properties: IdMap<NodeGraphProperty>,
   nodes: IdMap<Node>,
   groups: IdMap<NodeGroup>,
   connections: ConnectionMap,

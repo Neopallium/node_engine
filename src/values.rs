@@ -108,10 +108,10 @@ impl Value {
       Self::Mat2(v) => v.ui(ui),
       Self::Mat3(v) => v.ui(ui),
       Self::Mat4(v) => v.ui(ui),
-      Self::Texture2D(_) => false,
-      Self::Texture2DArray(_) => false,
-      Self::Texture3D(_) => false,
-      Self::Cubemap(_) => false,
+      Self::Texture2D(v) => v.ui(ui),
+      Self::Texture2DArray(v) => v.ui(ui),
+      Self::Texture3D(v) => v.ui(ui),
+      Self::Cubemap(v) => v.ui(ui),
     }
   }
 }
