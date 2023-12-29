@@ -14,10 +14,6 @@ pub type NodeId = Uuid;
 
 pub const NAMESPACE_NODE_IMPL: Uuid = uuid::uuid!("9dee91a8-5af8-11ee-948b-5364d73b1803");
 
-pub fn node_idx(id: NodeId) -> u64 {
-  id.as_u64_pair().0
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InputId {
   pub node: NodeId,

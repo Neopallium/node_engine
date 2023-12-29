@@ -11,6 +11,7 @@ pub enum DataTypeClass {
   Scalar,
   Vector,
   Matrix,
+  Texture,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -24,6 +25,10 @@ pub enum DataType {
   Mat2,
   Mat3,
   Mat4,
+  Texture2D,
+  Texture2DArray,
+  Texture3D,
+  Cubemap,
 }
 
 impl DataType {
@@ -38,6 +43,10 @@ impl DataType {
       Self::Mat2 => DataTypeClass::Matrix,
       Self::Mat3 => DataTypeClass::Matrix,
       Self::Mat4 => DataTypeClass::Matrix,
+      Self::Texture2D => DataTypeClass::Texture,
+      Self::Texture2DArray => DataTypeClass::Texture,
+      Self::Texture3D => DataTypeClass::Texture,
+      Self::Cubemap => DataTypeClass::Texture,
     }
   }
 
@@ -52,6 +61,10 @@ impl DataType {
       Self::Mat2 => Value::Mat2(Default::default()),
       Self::Mat3 => Value::Mat3(Default::default()),
       Self::Mat4 => Value::Mat4(Default::default()),
+      Self::Texture2D => Value::Texture2D(Default::default()),
+      Self::Texture2DArray => Value::Texture2DArray(Default::default()),
+      Self::Texture3D => Value::Texture3D(Default::default()),
+      Self::Cubemap => Value::Cubemap(Default::default()),
     }
   }
 
@@ -67,6 +80,10 @@ impl DataType {
       Self::Mat2 => egui::Color32::BLUE,
       Self::Mat3 => egui::Color32::BLUE,
       Self::Mat4 => egui::Color32::BLUE,
+      Self::Texture2D => egui::Color32::RED,
+      Self::Texture2DArray => egui::Color32::RED,
+      Self::Texture3D => egui::Color32::RED,
+      Self::Cubemap => egui::Color32::RED,
     }
   }
 
@@ -197,6 +214,126 @@ impl ValueType for f32 {
   #[cfg(feature = "egui")]
   fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     ui.add(egui::DragValue::new(self).speed(0.1)).changed()
+  }
+}
+
+impl ValueType for Texture2DHandle {
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
+  fn to_value(&self) -> Value {
+    Value::Texture2D(self.clone())
+  }
+
+  fn set_value(&mut self, value: Value) -> Result<()> {
+    match value {
+      Value::Texture2D(v) => {
+        *self = v;
+        Ok(())
+      }
+      _ => Err(anyhow!("Expected a Texture2D got: {value:?}")),
+    }
+  }
+
+  fn data_type(&self) -> DataType {
+    DataType::Texture2D
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.label("Texture2D");
+    false
+  }
+}
+
+impl ValueType for Texture2DArrayHandle {
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
+  fn to_value(&self) -> Value {
+    Value::Texture2DArray(self.clone())
+  }
+
+  fn set_value(&mut self, value: Value) -> Result<()> {
+    match value {
+      Value::Texture2DArray(v) => {
+        *self = v;
+        Ok(())
+      }
+      _ => Err(anyhow!("Expected a Texture2DArray got: {value:?}")),
+    }
+  }
+
+  fn data_type(&self) -> DataType {
+    DataType::Texture2DArray
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.label("Texture2DArray");
+    false
+  }
+}
+
+impl ValueType for Texture3DHandle {
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
+  fn to_value(&self) -> Value {
+    Value::Texture3D(self.clone())
+  }
+
+  fn set_value(&mut self, value: Value) -> Result<()> {
+    match value {
+      Value::Texture3D(v) => {
+        *self = v;
+        Ok(())
+      }
+      _ => Err(anyhow!("Expected a Texture3D got: {value:?}")),
+    }
+  }
+
+  fn data_type(&self) -> DataType {
+    DataType::Texture3D
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.label("Texture3D");
+    false
+  }
+}
+
+impl ValueType for CubemapHandle {
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
+  fn to_value(&self) -> Value {
+    Value::Cubemap(self.clone())
+  }
+
+  fn set_value(&mut self, value: Value) -> Result<()> {
+    match value {
+      Value::Cubemap(v) => {
+        *self = v;
+        Ok(())
+      }
+      _ => Err(anyhow!("Expected a Cubemap got: {value:?}")),
+    }
+  }
+
+  fn data_type(&self) -> DataType {
+    DataType::Cubemap
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.label("Cubemap");
+    false
   }
 }
 

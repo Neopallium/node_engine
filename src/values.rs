@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use core::any::Any;
 
 use heck::ToTitleCase;
@@ -17,6 +18,24 @@ pub use types::*;
 pub mod bindings;
 pub use bindings::*;
 
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TextureHandleInner {
+  pub id: uuid::Uuid,
+  pub name: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Texture2DHandle(Option<Arc<TextureHandleInner>>);
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Texture2DArrayHandle(Option<Arc<TextureHandleInner>>);
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Texture3DHandle(Option<Arc<TextureHandleInner>>);
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CubemapHandle(Option<Arc<TextureHandleInner>>);
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Value {
   I32(i32),
@@ -28,6 +47,10 @@ pub enum Value {
   Mat2(Mat2),
   Mat3(Mat3),
   Mat4(Mat4),
+  Texture2D(Texture2DHandle),
+  Texture2DArray(Texture2DArrayHandle),
+  Texture3D(Texture3DHandle),
+  Cubemap(CubemapHandle),
 }
 
 impl Default for Value {
@@ -48,6 +71,10 @@ impl Value {
       Self::Mat2(v) => v,
       Self::Mat3(v) => v,
       Self::Mat4(v) => v,
+      Self::Texture2D(v) => v,
+      Self::Texture2DArray(v) => v,
+      Self::Texture3D(v) => v,
+      Self::Cubemap(v) => v,
     }
   }
 
@@ -62,6 +89,10 @@ impl Value {
       Self::Mat2(_) => DataType::Mat2,
       Self::Mat3(_) => DataType::Mat3,
       Self::Mat4(_) => DataType::Mat4,
+      Self::Texture2D(_) => DataType::Texture2D,
+      Self::Texture2DArray(_) => DataType::Texture2DArray,
+      Self::Texture3D(_) => DataType::Texture3D,
+      Self::Cubemap(_) => DataType::Cubemap,
     }
   }
 
@@ -77,6 +108,10 @@ impl Value {
       Self::Mat2(v) => v.ui(ui),
       Self::Mat3(v) => v.ui(ui),
       Self::Mat4(v) => v.ui(ui),
+      Self::Texture2D(_) => false,
+      Self::Texture2DArray(_) => false,
+      Self::Texture3D(_) => false,
+      Self::Cubemap(_) => false,
     }
   }
 }

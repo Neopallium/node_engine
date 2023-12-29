@@ -6,6 +6,10 @@ use crate::graph::*;
 use crate::node::*;
 use crate::values::*;
 
+pub fn node_idx(id: NodeId) -> u64 {
+  id.as_u64_pair().0
+}
+
 /// Code block Id
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
 pub struct CodeBlockId(u32);
@@ -177,6 +181,22 @@ impl NodeGraphCompile {
       Value::Mat4(v) => {
         // TODO: Convert to wgsl syntax.
         format!("{v:?}")
+      }
+      Value::Texture2D(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Texture2DArray(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Texture3D(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Cubemap(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
       }
     })
   }
