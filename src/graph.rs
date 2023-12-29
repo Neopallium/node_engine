@@ -589,7 +589,6 @@ impl NodeGraph {
 #[derive(Clone)]
 #[cfg(feature = "egui")]
 pub struct NodeGraphEditor {
-  id: Uuid,
   pub title: String,
   pub size: emath::Vec2,
   pub graph: NodeGraph,
@@ -602,7 +601,6 @@ pub struct NodeGraphEditor {
 impl Default for NodeGraphEditor {
   fn default() -> Self {
     Self {
-      id: Uuid::new_v4(),
       title: "Graph editor".to_string(),
       size: (900., 500.).into(),
       graph: Default::default(),
@@ -621,7 +619,6 @@ impl NodeGraphEditor {
 
   pub fn show(&mut self, ctx: &egui::Context) {
     egui::Window::new(&self.title)
-      .id(egui::Id::new(&self.id))
       .default_size(self.size)
       .show(ctx, |ui| {
         egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
