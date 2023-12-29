@@ -18,6 +18,16 @@ impl Default for NodeFrameStyle {
 }
 
 #[derive(Clone, Debug)]
+pub enum NodeAction {
+  Dragged(emath::Vec2),
+  Resize,
+  /// false - Only delete the node, true - Also delete contained nodes (for groups).
+  Delete(bool),
+  /// Remove a node from a group.
+  LeaveGroup(Uuid),
+}
+
+#[derive(Clone, Debug)]
 pub struct NodeFrameState {
   pub updated: bool,
   pub selected: bool,
@@ -33,6 +43,49 @@ impl Default for NodeFrameState {
       edit_title: false,
       drag: None,
     }
+  }
+}
+
+impl NodeFrameState {
+  /// Return the updated state and clear it.
+  pub fn take_updated(&mut self) -> bool {
+    let updated = self.updated;
+    self.updated = false;
+    updated
+  }
+
+  pub fn is_dragging(&self) -> bool {
+    self.drag == Some(NodeFrameDragState::Drag)
+  }
+
+  pub fn node_selected(&mut self, rect: emath::Rect, selecting: &NodeSelectingState) -> bool {
+    match selecting {
+      NodeSelectingState::Selecting {
+        area, clear_old, ..
+      } => {
+        if self.selected && *clear_old {
+          self.selected = false;
+        }
+        self.selected | area.intersects(rect)
+      }
+      NodeSelectingState::Select { area } => {
+        if area.intersects(rect) {
+          self.selected = true;
+        }
+        self.selected
+      }
+      _ => self.selected,
+    }
+  }
+
+  /// Render the node.
+  pub fn render<N: NodeFrame + GetId>(
+    &mut self,
+    ui: &mut egui::Ui,
+    graph: &NodeGraphMeta,
+    node: &mut N,
+  ) -> Option<NodeAction> {
+    node.render(ui, graph, self)
   }
 }
 
@@ -91,14 +144,15 @@ pub trait NodeFrame: GetId {
   /// Set frame title.
   fn set_title(&mut self, title: String);
 
+  /// Return the node's updated state and clear it.
+  fn take_updated(&mut self, state: &mut NodeFrameState) -> bool {
+    state.take_updated()
+  }
+
   /// Frame style
   fn frame_style(&self) -> NodeFrameStyle {
     NodeFrameStyle::default()
   }
-
-  /// Frame UI state.
-  fn frame_state(&self) -> &NodeFrameState;
-  fn frame_state_mut(&mut self) -> &mut NodeFrameState;
 
   /// Automatically fit the frame's contents.
   fn auto_size(&self) -> bool {
@@ -110,53 +164,60 @@ pub trait NodeFrame: GetId {
     true
   }
 
-  /// Allow dragging.
-  fn draggable(&self) -> bool {
+  /// Allow moving.
+  fn movable(&self) -> bool {
     true
   }
 
-  /// Force draw, even if not visible.
-  fn updated(&self) -> bool {
-    self.frame_state().updated
-  }
-
-  /// Frame is selected.
-  fn selected(&self) -> bool {
-    self.frame_state().selected
-  }
-
-  /// Set frame selected state.
-  fn set_selected(&mut self, selected: bool) -> bool {
-    let state = self.frame_state_mut();
-    let old = state.selected;
-    state.selected = selected;
-    old
-  }
-
-  /// Handle drag events from other UI responses.
-  /// This is mainly to handle drag events from the title bar.
-  fn handle_dragged(&mut self, resp: &egui::Response, zoom: f32) {
-    if self.draggable() && resp.dragged() {
-      self.set_rect(self.rect().translate(resp.drag_delta() / zoom));
-      resp.scroll_to_me(None);
+  /// Handle moving - either the frame is being dragged or it's parent group is moving.
+  fn handle_move(&mut self, delta: emath::Vec2) {
+    if self.movable() {
+      self.set_rect(self.rect().translate(delta));
     }
   }
 
-  /// Handle other events.
-  fn handle_resp(&mut self, _ui: &egui::Ui, _resp: &egui::Response) {}
+  /// Handle events and context menu.
+  fn handle_resp(
+    &mut self,
+    _ui: &mut egui::Ui,
+    resp: egui::Response,
+    _graph: &NodeGraphMeta,
+    frame: &mut NodeFrameState,
+  ) -> Option<NodeAction> {
+    let mut action = None;
+    if resp.dragged() {
+      if frame.is_dragging() {
+        action = Some(NodeAction::Dragged(resp.drag_delta()));
+      } else {
+        action = Some(NodeAction::Resize);
+      }
+    }
+    resp.context_menu(|ui| {
+      if ui.button("Delete").clicked() {
+        action = Some(NodeAction::Delete(false));
+        ui.close_menu();
+      }
+    });
+    action
+  }
 
   /// Render the node.
-  fn render(&mut self, ui: &mut egui::Ui, offset: egui::Vec2) -> egui::Response {
+  fn render(
+    &mut self,
+    ui: &mut egui::Ui,
+    graph: &NodeGraphMeta,
+    state: &mut NodeFrameState,
+  ) -> Option<NodeAction> {
     let node_style = NodeStyle::get(ui);
     let zoom = node_style.zoom;
     // Zoom and translate frame to Screen space.
     let mut rect = self.rect();
-    if self.updated() && self.auto_size() {
+    let updated = self.take_updated(state);
+    if updated && self.auto_size() {
       // Recalculate size.
       rect.set_width(10.);
     }
-    rect.zoom(zoom);
-    rect = rect.translate(offset);
+    rect = graph.node_to_ui(rect);
 
     // Use child UI for frame.
     let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.id());
@@ -166,34 +227,37 @@ pub trait NodeFrame: GetId {
     let resp = ui.interact(rect, ui.id(), egui::Sense::click_and_drag());
 
     // Only render this frame if it is visible or the frame was updated.
-    if !self.updated() && !ui.is_rect_visible(rect) {
+    if !updated && !ui.is_rect_visible(rect) {
       // This is needed to stabilize Ui ids when frames become visible.
       ui.skip_ahead_auto_ids(1);
-      return resp;
+      return None;
     }
-    self.frame_state_mut().updated = false;
+
+    // Is the frame currently selected?
+    let selected = graph.selecting(|selecting| state.node_selected(rect, selecting));
 
     // Render frame UI.
-    self.frame_ui(ui, node_style);
+    self.frame_ui(ui, selected, state, node_style);
 
     // Handle events.
     if resp.clicked() {
-      let state = self.frame_state_mut();
       state.selected = !state.selected;
     } else if resp.dragged() {
-      match self.frame_state().drag.clone() {
+      let delta = resp.drag_delta() / zoom;
+      match state.drag.clone() {
         Some(NodeFrameDragState::Drag) => {
-          self.handle_dragged(&resp, zoom);
+          self.handle_move(delta);
+          resp.scroll_to_me(None);
         }
         Some(NodeFrameDragState::Resize(state)) => {
-          self.set_rect(state.resize_rect(self.rect(), resp.drag_delta() / zoom));
+          self.set_rect(state.resize_rect(self.rect(), delta));
           resp.scroll_to_me(None);
           state.set_cursor(ui);
         }
         None => (),
       }
     } else if resp.drag_released() {
-      self.frame_state_mut().drag = None;
+      state.drag = None;
     } else {
       // Get pointer.
       if let Some(pointer) = ui.ctx().pointer_interact_pos() {
@@ -207,8 +271,8 @@ pub trait NodeFrame: GetId {
         };
         // Drag the frame if inside the margin area.
         if inside.contains(pointer) {
-          self.frame_state_mut().drag = Some(NodeFrameDragState::Drag);
-          self.handle_dragged(&resp, zoom);
+          state.drag = Some(NodeFrameDragState::Drag);
+          self.handle_move(resp.drag_delta() / zoom);
         } else if self.resizable() && rect.contains(pointer) {
           // Detect sides
           let mut top = (rect.top() - pointer.y).abs() <= side_grab_radius;
@@ -234,38 +298,47 @@ pub trait NodeFrame: GetId {
               bottom = true;
             }
             // Handle resize.
-            let state = ResizeState {
+            let resize = ResizeState {
               top,
               right,
               bottom,
               left,
             };
-            state.set_cursor(ui);
-            self.frame_state_mut().drag = Some(NodeFrameDragState::Resize(state));
+            resize.set_cursor(ui);
+            state.drag = Some(NodeFrameDragState::Resize(resize));
           }
         }
       }
     }
-    self.handle_resp(ui, &resp);
+    let mut action = self.handle_resp(ui, resp, graph, state);
     if self.auto_size() {
       // Update frame size.
       let size = ui.min_rect().size() / zoom;
       if self.rect().size() != size {
-        self.frame_state_mut().updated = true;
+        state.updated = true;
+        if action.is_none() {
+          action = Some(NodeAction::Resize);
+        }
         self.set_rect(emath::Rect::from_min_size(self.rect().min, size));
       }
     }
-    resp
+    action
   }
 
   /// Draw the node's frame.
-  fn frame_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {
+  fn frame_ui(
+    &mut self,
+    ui: &mut egui::Ui,
+    selected: bool,
+    state: &mut NodeFrameState,
+    node_style: NodeStyle,
+  ) {
     // Window-style frame.
     let style = ui.style();
     let frame_style = self.frame_style();
     let mut frame = egui::Frame::window(style);
     frame.shadow = Default::default();
-    if self.selected() {
+    if selected {
       frame.stroke.color = frame_style.selected;
     }
 
@@ -273,7 +346,6 @@ pub trait NodeFrame: GetId {
       ui.vertical(|ui| {
         // Title bar.
         ui.horizontal(|ui| {
-          let state = self.frame_state();
           if state.edit_title {
             let mut title = self.title().to_string();
             let resp = ui.add(egui::TextEdit::singleline(&mut title).hint_text("Group name"));
@@ -281,7 +353,7 @@ pub trait NodeFrame: GetId {
               self.set_title(title);
             }
             if resp.lost_focus() {
-              self.frame_state_mut().edit_title = false;
+              state.edit_title = false;
             }
             resp.request_focus();
           } else {
@@ -293,7 +365,7 @@ pub trait NodeFrame: GetId {
                 i.pointer
                   .button_double_clicked(egui::PointerButton::Primary)
               }) {
-                self.frame_state_mut().edit_title = true;
+                state.edit_title = true;
               }
             }
           }

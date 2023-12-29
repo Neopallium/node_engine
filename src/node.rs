@@ -258,7 +258,7 @@ pub struct Node {
   node: Box<dyn NodeImpl>,
   pub area: emath::Rect,
   #[serde(skip)]
-  frame_state: NodeFrameState,
+  updated: bool,
 }
 
 impl GetId for Node {
@@ -285,10 +285,10 @@ impl Node {
       id: Uuid::new_v4(),
       group_id: Uuid::nil(),
       name: def.name.clone(),
-      node_type: def.uuid,
+      node_type: def.id,
       node: def.new_node()?,
       area: emath::Rect::from_min_size([0., 0.].into(), [10., 10.].into()),
-      frame_state: Default::default(),
+      updated: true,
     })
   }
 
@@ -300,7 +300,7 @@ impl Node {
       node_type: data.node_type,
       node: def.load_node(data.node)?,
       area: data.area,
-      frame_state: Default::default(),
+      updated: true,
     })
   }
 
@@ -350,7 +350,7 @@ impl Node {
   }
 
   pub fn set_input<I: Into<InputKey>>(&mut self, idx: I, value: Input) -> Result<Option<OutputId>> {
-    self.frame_state.updated = true;
+    self.updated = true;
     self.node.set_node_input(&idx.into(), value)
   }
 }
@@ -365,12 +365,10 @@ impl NodeFrame for Node {
     self.name = title;
   }
 
-  fn frame_state(&self) -> &NodeFrameState {
-    &self.frame_state
-  }
-
-  fn frame_state_mut(&mut self) -> &mut NodeFrameState {
-    &mut self.frame_state
+  fn take_updated(&mut self, state: &mut NodeFrameState) -> bool {
+    let updated = self.updated | state.take_updated();
+    self.updated = false;
+    updated
   }
 
   fn rect(&self) -> emath::Rect {
@@ -396,5 +394,37 @@ impl NodeFrame for Node {
         ui.set_min_width(node_style.node_min_size.x);
         self.node.ui(ui, self.id);
       });
+  }
+
+  /// Handle events and context menu.
+  fn handle_resp(
+    &mut self,
+    _ui: &mut egui::Ui,
+    resp: egui::Response,
+    _graph: &NodeGraphMeta,
+    frame: &mut NodeFrameState,
+  ) -> Option<NodeAction> {
+    let mut action = None;
+    if resp.dragged() {
+      if frame.is_dragging() {
+        action = Some(NodeAction::Dragged(resp.drag_delta()));
+      } else {
+        action = Some(NodeAction::Resize);
+      }
+    }
+    resp.context_menu(|ui| {
+      if ui.button("Delete").clicked() {
+        action = Some(NodeAction::Delete(false));
+        ui.close_menu();
+      }
+      if !self.group_id.is_nil() {
+        if ui.button("Remove from group").clicked() {
+          action = Some(NodeAction::LeaveGroup(self.group_id));
+          self.group_id = Uuid::nil();
+          ui.close_menu();
+        }
+      }
+    });
+    action
   }
 }

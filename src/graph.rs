@@ -11,72 +11,6 @@ use anyhow::{anyhow, Result};
 use crate::ui::*;
 use crate::*;
 
-pub type NodeGroupId = Uuid;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NodeGroup {
-  id: NodeGroupId,
-  title: String,
-  area: emath::Rect,
-  #[serde(skip)]
-  frame_state: NodeFrameState,
-}
-
-impl NodeGroup {
-  pub fn new() -> Self {
-    Self {
-      id: Uuid::new_v4(),
-      title: "".to_string(),
-      area: emath::Rect::NOTHING,
-      frame_state: Default::default(),
-    }
-  }
-
-  pub fn add_node(&mut self, node: &mut Node) {
-    node.group_id = self.id;
-    self.area = self.area.union(node.rect());
-  }
-
-  pub fn is_dragging(&self) -> bool {
-    Some(NodeFrameDragState::Drag) == self.frame_state().drag
-  }
-}
-
-#[cfg(feature = "egui")]
-impl NodeFrame for NodeGroup {
-  fn title(&self) -> &str {
-    &self.title
-  }
-
-  fn set_title(&mut self, title: String) {
-    self.title = title;
-  }
-
-  fn frame_state(&self) -> &NodeFrameState {
-    &self.frame_state
-  }
-
-  fn frame_state_mut(&mut self) -> &mut NodeFrameState {
-    &mut self.frame_state
-  }
-
-  fn rect(&self) -> emath::Rect {
-    self.area
-  }
-
-  fn set_rect(&mut self, rect: emath::Rect) {
-    self.area = rect;
-  }
-
-  /// Frame style
-  fn frame_style(&self) -> NodeFrameStyle {
-    NodeFrameStyle {
-      fill: egui::Color32::from_gray(10),
-      ..Default::default()
-    }
-  }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EditorState {
   size: emath::Vec2,
@@ -85,8 +19,6 @@ pub struct EditorState {
   scroll_offset: emath::Vec2,
   #[serde(skip)]
   current_pos: emath::Vec2,
-  #[serde(skip)]
-  selecting: Option<emath::Vec2>,
 }
 
 impl Default for EditorState {
@@ -99,7 +31,6 @@ impl Default for EditorState {
       zoom: 0.5,
       scroll_offset: origin - emath::vec2(450., 250.),
       current_pos: Default::default(),
-      selecting: None,
     }
   }
 }
@@ -119,12 +50,6 @@ impl EditorState {
 
 pub trait GetId {
   fn id(&self) -> Uuid;
-}
-
-impl GetId for NodeGroup {
-  fn id(&self) -> Uuid {
-    self.id
-  }
 }
 
 #[derive(Clone, Debug)]
@@ -242,48 +167,9 @@ impl NodeGraph {
     }
   }
 
-  pub fn take_selected(&mut self) -> Vec<NodeId> {
-    self
-      .nodes
-      .0
-      .iter_mut()
-      .filter_map(|(id, node)| {
-        if node.selected() {
-          node.set_selected(false);
-          Some(*id)
-        } else {
-          None
-        }
-      })
-      .collect()
-  }
-
-  pub fn clear_selected(&mut self) {
-    self.take_selected();
-  }
-
-  pub fn group_selected_nodes(&mut self) -> Option<NodeGroupId> {
-    let mut group = NodeGroup::new();
-
-    let mut empty = true;
-    for (_, node) in &mut self.nodes.0 {
-      if node.selected() {
-        empty = false;
-        group.add_node(node);
-      }
-    }
-
-    if empty {
-      None
-    } else {
-      group.area = group.area.expand(50.0);
-      Some(self.add_group(group))
-    }
-  }
-
   pub fn add_group(&mut self, mut group: NodeGroup) -> NodeGroupId {
     // Check for duplicate node group ids.
-    if self.contains(group.id) {
+    if self.groups.0.contains_key(&group.id) {
       group.id = Uuid::new_v4();
     }
     let id = group.id;
@@ -320,7 +206,7 @@ impl NodeGraph {
           area = area.union(node.rect());
         }
       }
-      group.area = area.expand(50.0);
+      group.set_area(area);
     }
   }
 
@@ -444,8 +330,36 @@ impl NodeGraph {
   pub fn output(&self) -> Option<NodeId> {
     self.output
   }
+}
 
-  #[cfg(feature = "egui")]
+#[cfg(feature = "egui")]
+impl NodeGraph {
+  pub fn group_selected_nodes(&mut self) -> Option<NodeGroupId> {
+    let mut group = NodeGroup::new();
+
+    let mut empty = true;
+    for node_id in self.ui_state.take_selected() {
+      if let Some(node) = self.nodes.0.get_mut(&node_id) {
+        group.add_node(node);
+        empty = false;
+      }
+    }
+
+    if empty {
+      None
+    } else {
+      let id = group.id;
+      self.groups.0.insert(id, group);
+      Some(id)
+    }
+  }
+
+  pub fn select_node(&mut self, id: NodeId, select: bool) {
+    self.ui_state.frame_state_mut(id, |frame| {
+      frame.selected = select;
+    });
+  }
+
   pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<egui::Response> {
     let mut scrolling = true;
     let mut selecting = true;
@@ -514,70 +428,53 @@ impl NodeGraph {
       let ui_min = ui.min_rect().min.to_vec2();
       let origin = origin + ui_min;
       let state = self.ui_state.clone();
-      state.load(ui, ui_min, zoom);
+      state.load(ui, origin, ui_min, zoom);
 
       // Convert pointer position to graph-space.  (Used for adding new nodes).
-      let mut select_area = None;
-      if ui.ui_contains_pointer() {
-        if let Some(pos) = ui.ctx().pointer_latest_pos() {
+      let mut pointer_pos = emath::Pos2::default();
+      if let Some(pos) = ui.ctx().pointer_latest_pos() {
+        pointer_pos = pos;
+        if ui.ui_contains_pointer() {
           self.editor.current_pos = (pos - origin).to_vec2() / zoom;
         }
       }
       // When not scrolling, detect click and drag to select nodes.
       let mut area_resp = None;
+      let mut select_state = None;
       if selecting {
         let id = ui.next_auto_id();
         let rect = ui.available_rect_before_wrap();
         let resp = ui.interact(rect, id, egui::Sense::click_and_drag());
-        if resp.drag_started() {
-          if self.editor.selecting.is_none() && clear_selected {
-            // Clear old selected states.
-            self.clear_selected();
+        state.selecting_mut(|selecting| {
+          if resp.drag_started() {
+            selecting.drag_started(pointer_pos, clear_selected);
+          } else if resp.drag_released() {
+            selecting.drag_released();
+          } else {
+            selecting.update(pointer_pos);
           }
-          self.editor.selecting = Some(self.editor.current_pos);
-        }
-        if let Some(start) = &self.editor.selecting {
-          select_area = Some(egui::Rect::from_points(&[
-            start.to_pos2(),
-            self.editor.current_pos.to_pos2(),
-          ]));
-        }
-        if resp.drag_released() {
-          self.editor.selecting = None;
-          // Select nodes.
-          if let Some(area) = select_area.take() {
-            for (_, node) in &mut self.nodes.0 {
-              if area.intersects(node.rect()) {
-                node.set_selected(true);
-              }
-            }
-          }
-        }
+          select_state = Some(selecting.clone());
+        });
         area_resp = Some(resp);
       }
 
       // Render groups.
       let mut remove_group = None;
       for (group_id, group) in &mut self.groups.0 {
-        let resp = group.render(ui, origin);
-        // If the group is being dragged, also drag the node in that group.
-        if resp.dragged() && group.is_dragging() {
-          for (_, node) in &mut self.nodes.0 {
-            if node.group_id == *group_id {
-              node.handle_dragged(&resp, zoom);
+        match state.render(ui, group) {
+          Some(NodeAction::Dragged(delta)) => {
+            let delta = delta / zoom;
+            for (_, node) in &mut self.nodes.0 {
+              if node.group_id == *group_id {
+                node.handle_move(delta);
+              }
             }
           }
+          Some(NodeAction::Delete(nodes)) => {
+            remove_group = Some((*group_id, nodes));
+          }
+          _ => (),
         }
-        resp.context_menu(|ui| {
-          if ui.button("Delete group").clicked() {
-            remove_group = Some((*group_id, false));
-            ui.close_menu();
-          }
-          if ui.button("Delete group and nodes").clicked() {
-            remove_group = Some((*group_id, true));
-            ui.close_menu();
-          }
-        });
       }
       if let Some((group_id, remove_nodes)) = remove_group {
         self.remove_group(group_id, remove_nodes);
@@ -587,26 +484,20 @@ impl NodeGraph {
       let mut remove_node = None;
       let mut resize_groups = BTreeSet::new();
       for (node_id, node) in &mut self.nodes.0 {
-        let resp = node.render(ui, origin);
-        // If the node was moved/resized or updated, recalculate the group size.
-        if resp.dragged() || node.updated() {
-          if !node.group_id.is_nil() {
-            resize_groups.insert(node.group_id);
-          }
-        }
-        resp.context_menu(|ui| {
-          if ui.button("Delete").clicked() {
-            remove_node = Some(*node_id);
-            ui.close_menu();
-          }
-          if !node.group_id.is_nil() {
-            if ui.button("Remove from group").clicked() {
+        match state.render(ui, node) {
+          Some(NodeAction::Dragged(_) | NodeAction::Resize) => {
+            if !node.group_id.is_nil() {
               resize_groups.insert(node.group_id);
-              node.group_id = Uuid::nil();
-              ui.close_menu();
             }
           }
-        });
+          Some(NodeAction::Delete(_)) => {
+            remove_node = Some(*node_id);
+          }
+          Some(NodeAction::LeaveGroup(group_id)) => {
+            resize_groups.insert(group_id);
+          }
+          None => (),
+        }
       }
       // Handle node actions.
       if let Some(node_id) = remove_node {
@@ -679,11 +570,8 @@ impl NodeGraph {
         }
       }
 
-      if let Some(mut select_area) = select_area {
-        select_area.zoom(zoom);
-        let rect = select_area.translate(origin);
-        ui.painter()
-          .rect_stroke(rect, 0.0, (0.5, egui::Color32::LIGHT_GRAY));
+      if let Some(selecting) = select_state {
+        selecting.ui(ui);
       }
 
       // Restore old NodeStyle.

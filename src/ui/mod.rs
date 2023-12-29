@@ -3,9 +3,12 @@ use std::sync::{Arc, RwLock};
 
 use egui::{self, NumExt};
 
+use indexmap::IndexMap;
+use uuid::Uuid;
+
 use crate::node::{InputId, NodeId, OutputId};
 use crate::values::DataType;
-use crate::{InputDefinition, OutputDefinition};
+use crate::{GetId, InputDefinition, OutputDefinition};
 
 mod frame;
 mod zoom;
@@ -17,7 +20,7 @@ const NODE_GRAPH_META: &'static str = "NodeGraphMeta";
 
 #[derive(Clone, Debug)]
 pub struct NodeStyle {
-  pub node_min_size: egui::Vec2,
+  pub node_min_size: emath::Vec2,
   pub line_stroke: egui::Stroke,
   pub zoom: f32,
 }
@@ -62,6 +65,57 @@ impl NodeStyle {
 }
 
 #[derive(Clone, Debug, Default)]
+pub enum NodeSelectingState {
+  #[default]
+  None,
+  Selecting {
+    start: emath::Pos2,
+    clear_old: bool,
+    area: emath::Rect,
+  },
+  Select {
+    area: emath::Rect,
+  },
+}
+
+impl NodeSelectingState {
+  pub fn update(&mut self, pos: emath::Pos2) {
+    match self {
+      Self::Selecting { area, start, .. } => {
+        // Update selected area.
+        *area = emath::Rect::from_points(&[*start, pos]);
+      }
+      Self::Select { .. } => {
+        // Reset back to not selecting state.
+        *self = Self::None;
+      }
+      _ => (),
+    }
+  }
+
+  pub fn drag_started(&mut self, start: emath::Pos2, clear_old: bool) {
+    *self = Self::Selecting {
+      start,
+      clear_old,
+      area: emath::Rect::from_points(&[start]),
+    }
+  }
+
+  pub fn drag_released(&mut self) {
+    if let Self::Selecting { area, .. } = *self {
+      *self = Self::Select { area };
+    }
+  }
+
+  pub fn ui(&self, ui: &egui::Ui) {
+    if let Self::Selecting { area, .. } = self {
+      ui.painter()
+        .rect_stroke(*area, 0.0, (0.5, egui::Color32::LIGHT_GRAY));
+    }
+  }
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct NodeSocketDragState {
   pub src: Option<NodeSocket>,
   pub dst: Option<NodeSocket>,
@@ -80,24 +134,61 @@ impl NodeSocketDragState {
 
 #[derive(Clone, Debug, Default)]
 struct NodeGraphMetaInner {
-  ui_min: egui::Vec2,
+  ui_min: emath::Vec2,
   zoom: f32,
+  origin: emath::Vec2,
   sockets: HashMap<NodeSocketId, NodeSocket>,
+  frames: IndexMap<Uuid, NodeFrameState>,
   drag_state: NodeSocketDragState,
+  selecting_state: NodeSelectingState,
 }
 
 impl NodeGraphMetaInner {
-  pub fn update(&mut self, ui_min: egui::Vec2, zoom: f32) {
+  pub fn update(&mut self, origin: emath::Vec2, ui_min: emath::Vec2, zoom: f32) {
+    self.origin = origin;
     self.ui_min = ui_min;
     self.zoom = zoom;
   }
 
   pub fn remove_node(&mut self, node_id: NodeId) {
     self.sockets.retain(|id, _| id.node() != node_id);
+    self.frames.retain(|id, _| id != &node_id);
+  }
+
+  pub fn take_selected(&mut self) -> Vec<Uuid> {
+    self
+      .frames
+      .iter_mut()
+      .filter_map(|(id, frame)| {
+        if frame.selected {
+          frame.selected = false;
+          Some(*id)
+        } else {
+          None
+        }
+      })
+      .collect()
+  }
+
+  pub fn frame_state(&self, id: Uuid) -> NodeFrameState {
+    self.frames.get(&id).cloned().unwrap_or_default()
+  }
+
+  pub fn frame_state_mut<R>(
+    &mut self,
+    id: Uuid,
+    writer: impl FnOnce(&mut NodeFrameState) -> R,
+  ) -> R {
+    let frame = self.frames.entry(id).or_default();
+    writer(frame)
+  }
+
+  pub fn set_frame_state(&mut self, id: Uuid, state: NodeFrameState) {
+    self.frames.insert(id, state);
   }
 
   /// Convert from UI screen-space to graph-space and unzoom.
-  pub fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2 {
+  pub fn ui_to_graph(&self, pos: egui::Pos2) -> emath::Vec2 {
     (pos.to_vec2() - self.ui_min) / self.zoom
   }
 
@@ -128,9 +219,9 @@ impl NodeGraphMeta {
     ui.data(|d| d.get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META)))
   }
 
-  pub fn load(&self, ui: &mut egui::Ui, ui_min: egui::Vec2, zoom: f32) {
+  pub fn load(&self, ui: &mut egui::Ui, origin: emath::Vec2, ui_min: emath::Vec2, zoom: f32) {
     let mut inner = self.0.write().unwrap();
-    inner.update(ui_min, zoom);
+    inner.update(origin, ui_min, zoom);
     ui.data_mut(|d| {
       d.insert_temp(egui::Id::new(NODE_GRAPH_META), self.clone());
     });
@@ -140,6 +231,40 @@ impl NodeGraphMeta {
     ui.data_mut(|d| {
       d.remove::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META));
     });
+  }
+
+  pub fn selecting<R>(&self, reader: impl FnOnce(&NodeSelectingState) -> R) -> R {
+    let inner = self.0.read().unwrap();
+    reader(&inner.selecting_state)
+  }
+
+  pub fn selecting_mut<R>(&self, writer: impl FnOnce(&mut NodeSelectingState) -> R) -> R {
+    let mut inner = self.0.write().unwrap();
+    writer(&mut inner.selecting_state)
+  }
+
+  pub fn take_selected(&self) -> Vec<Uuid> {
+    let mut inner = self.0.write().unwrap();
+    inner.take_selected()
+  }
+
+  pub fn clear_selected(&self) {
+    self.take_selected();
+  }
+
+  pub fn frame_state(&self, id: Uuid) -> NodeFrameState {
+    let inner = self.0.read().unwrap();
+    inner.frame_state(id)
+  }
+
+  pub fn set_frame_state(&self, id: Uuid, state: NodeFrameState) {
+    let mut inner = self.0.write().unwrap();
+    inner.set_frame_state(id, state);
+  }
+
+  pub fn frame_state_mut<R>(&self, id: Uuid, writer: impl FnOnce(&mut NodeFrameState) -> R) -> R {
+    let mut inner = self.0.write().unwrap();
+    inner.frame_state_mut(id, writer)
   }
 
   pub fn drag_state(&self) -> NodeSocketDragState {
@@ -168,9 +293,16 @@ impl NodeGraphMeta {
   }
 
   /// Convert from UI screen-space to graph-space and unzoom.
-  pub fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2 {
+  pub fn ui_to_graph(&self, pos: egui::Pos2) -> emath::Vec2 {
     let inner = self.0.read().unwrap();
     inner.ui_to_graph(pos)
+  }
+
+  /// Convert node position/size from graph-space to screen-space.
+  pub fn node_to_ui(&self, mut rect: emath::Rect) -> emath::Rect {
+    let inner = self.0.read().unwrap();
+    rect.zoom(inner.zoom);
+    rect.translate(inner.origin)
   }
 
   pub fn update_node_socket(&self, socket: &mut NodeSocket, pos: egui::Pos2) {
@@ -186,13 +318,26 @@ impl NodeGraphMeta {
     let inner = self.0.read().unwrap();
     inner.get_connection_meta(input, output)
   }
+
+  pub fn render<N: NodeFrame + GetId>(
+    &self,
+    ui: &mut egui::Ui,
+    node: &mut N,
+  ) -> Option<NodeAction> {
+    let id = node.id();
+    let mut frame = self.frame_state(id);
+
+    let action = frame.render(ui, self, node);
+    self.set_frame_state(id, frame);
+    action
+  }
 }
 
 #[derive(Clone, Debug)]
 pub struct NodeSocket {
   pub id: NodeSocketId,
   connected: bool,
-  pub center: egui::Vec2,
+  pub center: emath::Vec2,
   pub color: egui::Color32,
   pub dt: DataType,
 }
@@ -258,7 +403,7 @@ impl egui::Widget for NodeSocket {
     let spacing = &ui.spacing();
     let icon_width = spacing.icon_width;
     let desired_size =
-      egui::vec2(icon_width, icon_width).at_least(egui::Vec2::splat(spacing.interact_size.y));
+      egui::vec2(icon_width, icon_width).at_least(emath::Vec2::splat(spacing.interact_size.y));
 
     // 2. Allocating space:
     let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::drag());

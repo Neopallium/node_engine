@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use core::any::Any;
+use std::sync::Arc;
 
 use heck::ToTitleCase;
 use indexmap::IndexSet;

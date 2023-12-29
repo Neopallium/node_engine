@@ -1,6 +1,5 @@
 use glam::Vec4;
 
-use node_engine::ui::*;
 use node_engine::*;
 
 fn main() {
@@ -38,9 +37,9 @@ fn build_sub_graph(
     (0, Input::from(Vec4::ONE), Input::from(Vec4::ONE))
   };
   let mut node = node.duplicate();
-  node.frame_state_mut().selected = true;
   node.set_position(position);
   let id = graph.add(node);
+  graph.select_node(id, true);
   graph.set_node_input(id, "A", a)?;
   graph.set_node_input(id, "B", b)?;
 
