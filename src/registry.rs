@@ -124,9 +124,9 @@ impl NodeRegistryInner {
 
   fn register(&mut self, def: &NodeDefinition) -> Option<NodeDefinition> {
     let category = self.categories.get_category_mut(def.category.as_slice());
-    category.add_node(def.name.clone(), def.uuid);
-    self.name_to_id.insert(def.name.clone(), def.uuid);
-    self.nodes.insert(def.uuid, def.clone())
+    category.add_node(def.name.clone(), def.id);
+    self.name_to_id.insert(def.name.clone(), def.id);
+    self.nodes.insert(def.id, def.clone())
   }
 
   pub fn load_node(&self, data: LoadNodeState) -> Result<Node> {
@@ -281,11 +281,11 @@ impl NodeBuilder for NodeBuilderFn {
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct NodeDefinition {
+  pub id: Uuid,
   pub name: String,
   pub package: String,
   pub description: String,
   pub category: Vec<String>,
-  pub uuid: Uuid,
   pub parameters: IndexMap<String, ParameterDefinition>,
   pub inputs: IndexMap<String, InputDefinition>,
   pub outputs: IndexMap<String, OutputDefinition>,
@@ -299,11 +299,15 @@ pub struct NodeDefinition {
 impl NodeDefinition {
   pub fn new(
     name: &str,
+    module_path: &str,
     create: fn(&NodeDefinition, Option<serde_json::Value>) -> Result<Box<dyn NodeImpl>>,
   ) -> Self {
+    let id = uuid::Uuid::new_v5(&NAMESPACE_NODE_IMPL, module_path.as_bytes());
+    let package = module_path.split("::").next();
     Self {
+      id,
       name: name.to_string(),
-      uuid: uuid::Uuid::new_v5(&NAMESPACE_NODE_IMPL, name.as_bytes()),
+      package: package.map(|p| p.to_string()).unwrap_or_default(),
       builder: Arc::new(Box::new(NodeBuilderFn(create))),
       ..Default::default()
     }

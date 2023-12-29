@@ -578,7 +578,9 @@ macro_rules! impl_node {
 
       lazy_static::lazy_static! {
         pub static ref DEFINITION: $crate::NodeDefinition = {
-          let mut def = $crate::NodeDefinition::new($node_name, |_, data| {
+          // Use the module_path to generate the node definition id.
+          let path = module_path!();
+          let mut def = $crate::NodeDefinition::new($node_name, path, |_, data| {
             use serde::Deserialize;
             Ok(Box::new(match data {
               Some(data) => $node_ty_name::deserialize(data)?,
@@ -603,10 +605,6 @@ macro_rules! impl_node {
               def.custom.insert(stringify!($custom_field_name).to_string(), $custom_field_value.to_string());
             )*
           )?
-          // Detect crate name and use it as the default `package` name.
-          if let Some(package) = module_path!().split("::").next() {
-            def.package = package.to_string();
-          }
           $( def.package = $node_package.to_string(); )?
           // Save source file to help with debugging duplicates (uuid clashes).
           def.source_file = file!().to_string();
