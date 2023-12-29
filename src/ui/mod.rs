@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
 use egui::{self, NumExt};
 
 use crate::node::{InputId, NodeId, OutputId};
 use crate::values::DataType;
+use crate::{InputDefinition, OutputDefinition};
 
 mod frame;
 mod zoom;
@@ -10,10 +14,6 @@ pub use zoom::*;
 
 const NODE_STYLE: &'static str = "NodeStyle";
 const NODE_GRAPH_META: &'static str = "NodeGraphMeta";
-const NODE_SOCKET_DRAG_SRC: &'static str = "NodeSocketDragSrc";
-const NODE_SOCKET_DRAG_DST: &'static str = "NodeSocketDragDst";
-const NODE_INPUT_ID: &'static str = "NodeInputId";
-const NODE_OUTPUT_ID: &'static str = "NodeOutputId";
 
 #[derive(Clone, Debug)]
 pub struct NodeStyle {
@@ -41,118 +41,20 @@ impl Zoom for NodeStyle {
   }
 }
 
-pub trait NodeGraphAccess {
-  fn set_src_node_socket(&mut self, id: NodeSocketId);
-
-  fn get_src_node_socket(&self) -> Option<NodeSocketId>;
-
-  fn set_dst_node_socket(&mut self, id: NodeSocketId);
-
-  fn clear_dst_node_socket(&mut self);
-
-  fn get_dst_node_socket(&self) -> Option<NodeSocketId>;
-
-  fn get_dropped_node_sockets(&mut self) -> Option<(NodeSocketId, Option<NodeSocketId>)>;
-
-  fn update_node_socket(
-    &mut self,
-    id: NodeSocketId,
-    pos: egui::Pos2,
-    dt: DataType,
-    color: egui::Color32,
-  );
-
-  fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2;
-
-  fn node_graph_meta(&self) -> NodeGraphMeta;
-
-  fn set_node_graph_meta(&mut self, node_graph: NodeGraphMeta);
-
-  fn node_style(&self) -> NodeStyle;
-
-  fn set_node_style(&mut self, node_style: NodeStyle);
-
-  fn zoom_style(&mut self, zoom: f32) -> NodeStyle;
-}
-
-impl NodeGraphAccess for egui::Ui {
-  fn set_src_node_socket(&mut self, id: NodeSocketId) {
-    self.data_mut(|d| d.insert_temp(egui::Id::new(NODE_SOCKET_DRAG_SRC), id));
-  }
-
-  fn get_src_node_socket(&self) -> Option<NodeSocketId> {
-    self.data(|d| d.get_temp::<NodeSocketId>(egui::Id::new(NODE_SOCKET_DRAG_SRC)))
-  }
-
-  fn set_dst_node_socket(&mut self, id: NodeSocketId) {
-    self.data_mut(|d| d.insert_temp(egui::Id::new(NODE_SOCKET_DRAG_DST), id));
-  }
-
-  fn clear_dst_node_socket(&mut self) {
-    self.data_mut(|d| d.remove::<NodeSocketId>(egui::Id::new(NODE_SOCKET_DRAG_DST)));
-  }
-
-  fn get_dst_node_socket(&self) -> Option<NodeSocketId> {
-    self.data(|d| d.get_temp::<NodeSocketId>(egui::Id::new(NODE_SOCKET_DRAG_DST)))
-  }
-
-  fn get_dropped_node_sockets(&mut self) -> Option<(NodeSocketId, Option<NodeSocketId>)> {
-    self.data_mut(|d| {
-      let src = d.get_temp::<NodeSocketId>(egui::Id::new(NODE_SOCKET_DRAG_SRC));
-      let dst = d.get_temp::<NodeSocketId>(egui::Id::new(NODE_SOCKET_DRAG_DST));
-      d.remove::<NodeSocketId>(egui::Id::new(NODE_SOCKET_DRAG_SRC));
-      d.remove::<NodeSocketId>(egui::Id::new(NODE_SOCKET_DRAG_DST));
-      src.map(|src| (src, dst))
-    })
-  }
-
-  fn update_node_socket(
-    &mut self,
-    id: NodeSocketId,
-    pos: egui::Pos2,
-    dt: DataType,
-    color: egui::Color32,
-  ) {
-    self.data_mut(|d| {
-      let graph = d
-        .get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META))
-        .unwrap_or_default();
-      let meta = d.get_temp_mut_or_default::<NodeSocketMeta>(id.ui_id());
-      meta.center = graph.ui_to_graph(pos);
-      meta.dt = dt;
-      meta.color = color;
-    });
-  }
-
-  fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2 {
-    let graph = self.node_graph_meta();
-    graph.ui_to_graph(pos)
-  }
-
-  fn node_graph_meta(&self) -> NodeGraphMeta {
-    self
-      .data(|d| d.get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META)))
+impl NodeStyle {
+  pub fn get(ui: &mut egui::Ui) -> Self {
+    ui.data(|d| d.get_temp::<Self>(egui::Id::new(NODE_STYLE)))
       .unwrap_or_default()
   }
 
-  fn set_node_graph_meta(&mut self, node_graph: NodeGraphMeta) {
-    self.data_mut(|d| d.insert_temp(egui::Id::new(NODE_GRAPH_META), node_graph));
+  pub fn set(&self, ui: &mut egui::Ui) {
+    ui.data_mut(|d| d.insert_temp(egui::Id::new(NODE_STYLE), self.clone()));
   }
 
-  fn node_style(&self) -> NodeStyle {
-    self
-      .data(|d| d.get_temp::<NodeStyle>(egui::Id::new(NODE_STYLE)))
-      .unwrap_or_default()
-  }
-
-  fn set_node_style(&mut self, node_style: NodeStyle) {
-    self.data_mut(|d| d.insert_temp(egui::Id::new(NODE_STYLE), node_style));
-  }
-
-  fn zoom_style(&mut self, zoom: f32) -> NodeStyle {
-    self.style_mut().zoom(zoom);
-    self.data_mut(|d| {
-      let node_style = d.get_temp_mut_or_default::<NodeStyle>(egui::Id::new(NODE_STYLE));
+  pub fn zoom_style(ui: &mut egui::Ui, zoom: f32) -> Self {
+    ui.style_mut().zoom(zoom);
+    ui.data_mut(|d| {
+      let node_style = d.get_temp_mut_or_default::<Self>(egui::Id::new(NODE_STYLE));
       node_style.zoom(zoom);
       node_style.clone()
     })
@@ -160,70 +62,198 @@ impl NodeGraphAccess for egui::Ui {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct NodeGraphMeta {
-  pub ui_min: egui::Vec2,
-  pub zoom: f32,
+pub struct NodeSocketDragState {
+  pub src: Option<NodeSocket>,
+  pub dst: Option<NodeSocket>,
 }
 
-impl NodeGraphMeta {
+impl NodeSocketDragState {
+  pub fn get_dropped_node_sockets(&self) -> Option<(NodeSocket, Option<NodeSocket>)> {
+    self.src.clone().map(|src| (src, self.dst.clone()))
+  }
+
+  pub fn clear_dropped_node_sockets(&mut self) {
+    self.src = None;
+    self.dst = None;
+  }
+}
+
+#[derive(Clone, Debug, Default)]
+struct NodeGraphMetaInner {
+  ui_min: egui::Vec2,
+  zoom: f32,
+  sockets: HashMap<NodeSocketId, NodeSocket>,
+  drag_state: NodeSocketDragState,
+}
+
+impl NodeGraphMetaInner {
+  pub fn update(&mut self, ui_min: egui::Vec2, zoom: f32) {
+    self.ui_min = ui_min;
+    self.zoom = zoom;
+  }
+
+  pub fn remove_node(&mut self, node_id: NodeId) {
+    self.sockets.retain(|id, _| id.node() != node_id);
+  }
+
   /// Convert from UI screen-space to graph-space and unzoom.
   pub fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2 {
     (pos.to_vec2() - self.ui_min) / self.zoom
   }
+
+  pub fn update_node_socket(&mut self, socket: &mut NodeSocket, pos: egui::Pos2) {
+    socket.center = self.ui_to_graph(pos);
+    self.sockets.insert(socket.id, socket.clone());
+  }
+
+  pub fn get_connection_meta(
+    &self,
+    input: &InputId,
+    output: &OutputId,
+  ) -> Option<(NodeSocket, NodeSocket)> {
+    self.sockets.get(&input.into()).and_then(|in_meta| {
+      self
+        .sockets
+        .get(&output.into())
+        .map(|out_meta| (in_meta.clone(), out_meta.clone()))
+    })
+  }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct NodeGraphMeta(Arc<RwLock<NodeGraphMetaInner>>);
+
+impl NodeGraphMeta {
+  pub fn get(ui: &egui::Ui) -> Option<Self> {
+    ui.data(|d| d.get_temp::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META)))
+  }
+
+  pub fn load(&self, ui: &mut egui::Ui, ui_min: egui::Vec2, zoom: f32) {
+    let mut inner = self.0.write().unwrap();
+    inner.update(ui_min, zoom);
+    ui.data_mut(|d| {
+      d.insert_temp(egui::Id::new(NODE_GRAPH_META), self.clone());
+    });
+  }
+
+  pub fn unload(&self, ui: &mut egui::Ui) {
+    ui.data_mut(|d| {
+      d.remove::<NodeGraphMeta>(egui::Id::new(NODE_GRAPH_META));
+    });
+  }
+
+  pub fn drag_state(&self) -> NodeSocketDragState {
+    let inner = self.0.read().unwrap();
+    inner.drag_state.clone()
+  }
+
+  pub fn set_drag_state(&self, state: NodeSocketDragState) {
+    let mut inner = self.0.write().unwrap();
+    inner.drag_state = state;
+  }
+
+  pub fn get_dropped_node_sockets(&self) -> Option<(NodeSocket, Option<NodeSocket>)> {
+    let inner = self.0.read().unwrap();
+    inner.drag_state.get_dropped_node_sockets()
+  }
+
+  pub fn clear_dropped_node_sockets(&self) {
+    let mut inner = self.0.write().unwrap();
+    inner.drag_state.clear_dropped_node_sockets();
+  }
+
+  pub fn remove_node(&self, node_id: NodeId) {
+    let mut inner = self.0.write().unwrap();
+    inner.remove_node(node_id);
+  }
+
+  /// Convert from UI screen-space to graph-space and unzoom.
+  pub fn ui_to_graph(&self, pos: egui::Pos2) -> egui::Vec2 {
+    let inner = self.0.read().unwrap();
+    inner.ui_to_graph(pos)
+  }
+
+  pub fn update_node_socket(&self, socket: &mut NodeSocket, pos: egui::Pos2) {
+    let mut inner = self.0.write().unwrap();
+    inner.update_node_socket(socket, pos)
+  }
+
+  pub fn get_connection_meta(
+    &self,
+    input: &InputId,
+    output: &OutputId,
+  ) -> Option<(NodeSocket, NodeSocket)> {
+    let inner = self.0.read().unwrap();
+    inner.get_connection_meta(input, output)
+  }
 }
 
 #[derive(Clone, Debug)]
-pub struct NodeSocketMeta {
-  pub center: egui::Vec2,
-  pub dt: DataType,
-  pub color: egui::Color32,
-}
-
-impl Default for NodeSocketMeta {
-  fn default() -> Self {
-    Self {
-      center: Default::default(),
-      dt: DataType::F32,
-      color: Default::default(),
-    }
-  }
-}
-
-impl NodeSocketMeta {
-  pub fn color(&self) -> egui::Color32 {
-    self.color
-  }
-}
-
 pub struct NodeSocket {
-  id: NodeSocketId,
+  pub id: NodeSocketId,
   connected: bool,
-  color: Option<egui::Color32>,
+  pub center: egui::Vec2,
+  pub color: egui::Color32,
+  pub dt: DataType,
 }
 
 impl NodeSocket {
-  pub fn new(id: NodeSocketId, connected: bool, color: Option<egui::Color32>) -> Self {
+  pub fn input(node: NodeId, idx: usize, connected: bool, def: &InputDefinition) -> Self {
+    let id = NodeSocketId::input(node, idx as _);
+    Self::new(id, connected, def.value_type, def.color)
+  }
+
+  pub fn output(node: NodeId, idx: usize, def: &OutputDefinition) -> Self {
+    let id = NodeSocketId::output(node, idx as _);
+    Self::new(id, false, def.value_type, def.color)
+  }
+
+  pub fn new(
+    id: NodeSocketId,
+    connected: bool,
+    dt: DataType,
+    color: Option<egui::Color32>,
+  ) -> Self {
     Self {
       id,
       connected,
-      color,
+      center: Default::default(),
+      color: color.unwrap_or_else(|| dt.color()),
+      dt,
     }
   }
 
-  pub fn color(&self) -> egui::Color32 {
-    if let Some(color) = &self.color {
-      *color
-    } else {
-      self.id.color()
+  pub fn is_compatible(&self, dst: &NodeSocket) -> bool {
+    self.id.is_compatible(dst.id) && self.dt.is_compatible(&dst.dt)
+  }
+
+  pub fn input_id_first(
+    &self,
+    dst: Option<NodeSocket>,
+  ) -> Option<(InputId, Option<(OutputId, DataType)>)> {
+    match (self.id, dst.map(|d| (d.id, d.dt))) {
+      // Disconect input.
+      (NodeSocketId::Input(id), None) => Some((id, None)),
+      // Connect input to output.
+      (NodeSocketId::Input(input), Some((NodeSocketId::Output(output), dt)))
+        if input.node != output.node =>
+      {
+        Some((input, Some((output, dt))))
+      }
+      // Connect output to input.
+      (NodeSocketId::Output(output), Some((NodeSocketId::Input(input), dt)))
+        if input.node != output.node =>
+      {
+        Some((input, Some((output, dt))))
+      }
+      // Other non-compatible connections.
+      _ => None,
     }
   }
 }
 
 impl egui::Widget for NodeSocket {
-  fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-    let color = self.color();
-    let Self { id, connected, .. } = self;
-
+  fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
     // 1. Deciding widget size:
     let spacing = &ui.spacing();
     let icon_width = spacing.icon_width;
@@ -236,30 +266,42 @@ impl egui::Widget for NodeSocket {
     let (small_icon_rect, big_icon_rect) = ui.spacing().icon_rectangles(rect);
     let center = small_icon_rect.center();
 
+    let graph = match NodeGraphMeta::get(ui) {
+      Some(graph) => graph,
+      None => {
+        return ui.label("NodeSocket not inside a NodeGraph");
+      }
+    };
     // Update socket metadata.
-    ui.update_node_socket(id, center, self.id.data_type(), color);
+    graph.update_node_socket(&mut self, center);
+
+    // Get current socket drag state.
+    let mut drag_state = graph.drag_state();
 
     // 3. Interact: Time to check for clicks!
     if response.drag_started() {
-      ui.set_src_node_socket(id);
+      drag_state.src = Some(self.clone());
     }
     // `hovered()` doesn't work during drag.
     let mut hovered = ui.rect_contains_pointer(rect) || response.hovered();
     if hovered {
-      if let Some(src) = ui.get_src_node_socket() {
+      if let Some(src) = &drag_state.src {
         // Check if src socket is compatible.
-        if src.is_compatible(id) {
-          ui.set_dst_node_socket(id);
+        if self.is_compatible(src) {
+          drag_state.dst = Some(self.clone());
         } else {
           hovered = false;
-          ui.clear_dst_node_socket();
+          drag_state.dst = None;
         }
       }
-    } else if ui.get_dst_node_socket() == Some(id) {
-      // No longer hovering our socket.  Cleanup.
-      ui.clear_dst_node_socket();
+    } else if let Some(dst) = &drag_state.dst {
+      if dst.id == self.id {
+        // No longer hovering our socket.  Cleanup.
+        drag_state.dst = None;
+      }
     }
-    let selected = hovered || connected;
+    graph.set_drag_state(drag_state);
+    let selected = hovered || self.connected;
 
     // We will follow the current style by asking
     // "how should something that is being interacted with be painted?".
@@ -267,7 +309,7 @@ impl egui::Widget for NodeSocket {
     let style = ui.style();
     let visuals = style.interact_selectable(&response, selected);
     let mut bg_stroke = visuals.bg_stroke;
-    bg_stroke.color = color;
+    bg_stroke.color = self.color;
     if hovered {
       bg_stroke = bg_stroke;
     }
@@ -287,7 +329,7 @@ impl egui::Widget for NodeSocket {
       painter.circle(center, big_radius, visuals.bg_fill, bg_stroke);
 
       if selected {
-        painter.circle_filled(center, small_radius, color);
+        painter.circle_filled(center, small_radius, self.color);
       }
     }
     response
@@ -296,104 +338,51 @@ impl egui::Widget for NodeSocket {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NodeSocketId {
-  Input(u32, InputId, DataType),
-  Output(u32, OutputId, DataType),
+  Input(InputId),
+  Output(OutputId),
+}
+
+impl From<&InputId> for NodeSocketId {
+  fn from(id: &InputId) -> Self {
+    NodeSocketId::Input(*id)
+  }
+}
+
+impl From<&OutputId> for NodeSocketId {
+  fn from(id: &OutputId) -> Self {
+    NodeSocketId::Output(*id)
+  }
 }
 
 impl NodeSocketId {
-  pub fn input(graph: u32, node: NodeId, idx: u32, dt: DataType) -> Self {
-    Self::Input(graph, InputId::new(node, idx), dt)
+  pub fn input(node: NodeId, idx: u32) -> Self {
+    Self::Input(InputId::new(node, idx))
   }
 
-  pub fn output(graph: u32, node: NodeId, idx: u32, dt: DataType) -> Self {
-    Self::Output(graph, OutputId::new(node, idx), dt)
+  pub fn output(node: NodeId, idx: u32) -> Self {
+    Self::Output(OutputId::new(node, idx))
   }
 
   pub fn is_compatible(&self, dst: NodeSocketId) -> bool {
     match (self, &dst) {
-      (Self::Input(g_in, input, dt_in), Self::Output(g_out, output, dt_out))
-      | (Self::Output(g_out, output, dt_out), Self::Input(g_in, input, dt_in))
-        if g_in == g_out =>
-      {
-        input.node != output.node && dt_in.is_compatible(dt_out)
+      (Self::Input(input), Self::Output(output)) | (Self::Output(output), Self::Input(input)) => {
+        input.node != output.node
       }
       _ => false,
     }
   }
 
-  pub fn input_id_first(
-    &self,
-    dst: Option<NodeSocketId>,
-  ) -> Option<(InputId, Option<(OutputId, DataType)>)> {
-    match (*self, dst) {
-      // Disconect input.
-      (Self::Input(_, id, _), None) => Some((id, None)),
-      // Connect input to output.
-      (Self::Input(g_in, input, _), Some(Self::Output(g_out, output, dt)))
-        if g_in == g_out && input.node != output.node =>
-      {
-        Some((input, Some((output, dt))))
-      }
-      // Connect output to input.
-      (Self::Output(g_out, output, dt), Some(Self::Input(g_in, input, _)))
-        if g_in == g_out && input.node != output.node =>
-      {
-        Some((input, Some((output, dt))))
-      }
-      // Other non-compatible connections.
-      _ => None,
-    }
-  }
-
-  pub fn is_input(&self) -> bool {
-    self.as_input_id().is_some()
-  }
-
   pub fn as_input_id(&self) -> Option<InputId> {
     match self {
-      Self::Input(_, id, _) => Some(*id),
+      Self::Input(id) => Some(*id),
       _ => None,
     }
   }
 
-  pub fn is_output(&self) -> bool {
-    self.as_output_id().is_some()
-  }
-
-  pub fn as_output_id(&self) -> Option<OutputId> {
+  pub fn node(&self) -> NodeId {
     match self {
-      Self::Output(_, id, _) => Some(*id),
-      _ => None,
+      Self::Input(id) => id.node(),
+      Self::Output(id) => id.node(),
     }
-  }
-
-  pub fn data_type(&self) -> DataType {
-    match self {
-      Self::Input(_, _, dt) => *dt,
-      Self::Output(_, _, dt) => *dt,
-    }
-  }
-
-  pub fn color(&self) -> egui::Color32 {
-    self.data_type().color()
-  }
-
-  pub fn ui_id(&self) -> egui::Id {
-    match self {
-      Self::Input(_graph, id, _) => id.ui_id(),
-      Self::Output(_graph, id, _) => id.ui_id(),
-    }
-  }
-}
-
-impl InputId {
-  pub fn ui_id(&self) -> egui::Id {
-    egui::Id::new(NODE_INPUT_ID).with(self.node).with(self.idx)
-  }
-}
-
-impl OutputId {
-  pub fn ui_id(&self) -> egui::Id {
-    egui::Id::new(NODE_OUTPUT_ID).with(self.node).with(self.idx)
   }
 }

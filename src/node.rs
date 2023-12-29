@@ -110,7 +110,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
     let input_count = def.inputs.len();
     let output_count = def.outputs.len();
     let param_count = def.parameters.len();
-    let node_style = ui.node_style();
+    let node_style = NodeStyle::get(ui);
     let zoom = node_style.zoom;
     ui.vertical(|ui| {
       ui.horizontal(|ui| {
@@ -140,9 +140,8 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
   fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
     let mut input_changed = None;
     for (idx, (name, def)) in self.def().inputs.iter().enumerate() {
-      let idx = idx as u32;
       ui.horizontal(|ui| {
-        let input_key = InputKey::from(idx);
+        let input_key = InputKey::from(idx as u32);
         let (connected, value) = match self.get_node_input(&input_key) {
           Ok(Input::Value(val)) => (false, Some(val)),
           Ok(Input::Connect(_, _)) => (true, None),
@@ -152,8 +151,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
             return;
           }
         };
-        let input_id = NodeSocketId::input(0, id, idx, def.value_type);
-        ui.add(NodeSocket::new(input_id, connected, def.color));
+        ui.add(NodeSocket::input(id, idx, connected, def));
         if connected {
           ui.label(name);
         } else {
@@ -186,7 +184,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
             return;
           }
         };
-        ui.label(format!("{}", name));
+        ui.label(name);
         if def.ui(ui, &mut value) {
           parameter_changed = Some((name.to_string(), value));
         }
@@ -204,10 +202,8 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
     for (idx, (name, def)) in self.def().outputs.iter().enumerate() {
       ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-          let connected = false;
-          let output_id = NodeSocketId::output(0, id, idx as _, def.value_type);
-          ui.add(NodeSocket::new(output_id, connected, def.color));
-          ui.label(format!("{}", name));
+          ui.add(NodeSocket::output(id, idx, def));
+          ui.label(name);
         });
       });
     }

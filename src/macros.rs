@@ -720,7 +720,7 @@ macro_rules! impl_node {
           let mut _defs = DEFINITION.inputs.values().enumerate();
           $(
             if let Some((idx, def)) = _defs.next() {
-              self.$field_input_name.ui(idx as u32, def, _ui, _id);
+              self.$field_input_name.ui(idx, def, _ui, _id);
             }
           )*
         }
@@ -730,7 +730,7 @@ macro_rules! impl_node {
           let mut _defs = DEFINITION.outputs.values().enumerate();
           $(
             if let Some((idx, def)) = _defs.next() {
-              self.$field_output_name.ui(idx as u32, def, _ui, _id);
+              self.$field_output_name.ui(idx, def, _ui, _id);
             }
           )*
         }

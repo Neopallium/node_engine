@@ -208,16 +208,23 @@ impl<'de> Deserialize<'de> for ConnectionMap {
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
+  id: Uuid,
   editor: EditorState,
   nodes: IdMap<Node>,
   groups: IdMap<NodeGroup>,
   connections: ConnectionMap,
   output: Option<NodeId>,
+  #[serde(skip)]
+  #[cfg(feature = "egui")]
+  ui_state: NodeGraphMeta,
 }
 
 impl NodeGraph {
   pub fn new() -> Self {
-    Self::default()
+    Self {
+      id: Uuid::new_v4(),
+      ..Self::default()
+    }
   }
 
   pub fn take_selected(&mut self) -> Vec<NodeId> {
@@ -332,6 +339,11 @@ impl NodeGraph {
         true
       }
     });
+    #[cfg(feature = "egui")]
+    {
+      // Remove all UI state for the node
+      self.ui_state.remove_node(id);
+    }
     // Remove node.
     self.nodes.0.remove(&id)
   }
@@ -475,10 +487,10 @@ impl NodeGraph {
     // Show scroll area.
     let out = scroll_area.show(ui, |ui| {
       // Save old node style.
-      let old_node_style = ui.node_style();
+      let old_node_style = NodeStyle::get(ui);
 
       // Apply zoom to Ui style.
-      let node_style = ui.zoom_style(zoom);
+      let node_style = NodeStyle::zoom_style(ui, zoom);
 
       // Set node graph area.
       ui.set_width(size.x);
@@ -486,7 +498,8 @@ impl NodeGraph {
       // Need UI screen-space `min` to covert from graph-space to screen-space.
       let ui_min = ui.min_rect().min.to_vec2();
       let origin = origin + ui_min;
-      ui.set_node_graph_meta(NodeGraphMeta { ui_min, zoom });
+      let state = self.ui_state.clone();
+      state.load(ui, ui_min, zoom);
 
       // Convert pointer position to graph-space.  (Used for adding new nodes).
       let mut select_area = None;
@@ -588,10 +601,11 @@ impl NodeGraph {
         self.resize_group(group_id);
       }
 
-      // Handle connecting/disconnecting.
-      if ui.input(|i| i.pointer.any_released()) {
-        // Check if a connection was being dragged.
-        if let Some((src, dst)) = ui.get_dropped_node_sockets() {
+      // Check if a connection was being dragged.
+      if let Some((src, dst)) = state.get_dropped_node_sockets() {
+        // Handle connecting/disconnecting.
+        if ui.input(|i| i.pointer.any_released()) {
+          state.clear_dropped_node_sockets();
           // Make sure the input is first and that the sockets are compatible.
           if let Some((src, dst)) = src.input_id_first(dst) {
             if let Some((dst, dt)) = dst {
@@ -606,42 +620,35 @@ impl NodeGraph {
               }
             }
           }
-        }
-      } else if let Some(src) = ui.get_src_node_socket() {
-        // Still dragging a connection.
-        if ui.get_dst_node_socket().is_some() {
-          ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
         } else {
-          ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
-        }
-        // If the dragged socket is an input, then remove it's current connection.
-        if let Some(src) = src.as_input_id() {
-          if let Err(err) = self.disconnect(src) {
-            log::warn!("Failed to disconnect input[{src:?}]: {err:?}");
+          // Still dragging a connection.
+          if dst.is_some() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+          } else {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+          }
+          // If the dragged socket is an input, then remove it's current connection.
+          if let Some(src) = src.id.as_input_id() {
+            if let Err(err) = self.disconnect(src) {
+              log::warn!("Failed to disconnect input[{src:?}]: {err:?}");
+            }
+          }
+          if let Some(end) = ui.ctx().pointer_latest_pos() {
+            let center = (src.center * zoom).to_pos2() + ui_min;
+            let mut stroke = node_style.line_stroke;
+            stroke.color = src.color;
+            ui.painter().line_segment([center, end], stroke);
           }
         }
-        if let Some(end) = ui.ctx().pointer_latest_pos() {
-          let src_meta = ui
-            .data(|d| d.get_temp::<NodeSocketMeta>(src.ui_id()))
-            .unwrap();
-          let center = (src_meta.center * zoom).to_pos2() + ui_min;
-          let mut stroke = node_style.line_stroke;
-          stroke.color = src.color();
-          ui.painter().line_segment([center, end], stroke);
-        }
       }
+
+      // Unload the graph state from egui.
+      state.unload(ui);
 
       // Draw connections.
       let painter = ui.painter();
       for (input, output) in &self.connections.0 {
-        let in_id = input.ui_id();
-        let out_id = output.ui_id();
-        let meta = ui.data(|d| {
-          d.get_temp::<NodeSocketMeta>(in_id).and_then(|in_meta| {
-            d.get_temp::<NodeSocketMeta>(out_id)
-              .map(|out_meta| (in_meta, out_meta))
-          })
-        });
+        let meta = state.get_connection_meta(input, output);
         if let Some((in_meta, out_meta)) = meta {
           // Convert the sockets back to screen-space
           // and apply zoom.
@@ -651,7 +658,7 @@ impl NodeGraph {
           // Check if part of the connection is visible.
           if ui.is_rect_visible(rect) {
             let mut stroke = node_style.line_stroke;
-            stroke.color = out_meta.color();
+            stroke.color = out_meta.color;
             painter.line_segment([in_pos, out_pos], stroke);
           }
         }
@@ -665,7 +672,7 @@ impl NodeGraph {
       }
 
       // Restore old NodeStyle.
-      ui.set_node_style(old_node_style);
+      old_node_style.set(ui);
 
       area_resp
     });
@@ -679,6 +686,8 @@ impl NodeGraph {
 #[derive(Clone)]
 #[cfg(feature = "egui")]
 pub struct NodeGraphEditor {
+  id: Uuid,
+  pub title: String,
   pub size: emath::Vec2,
   pub graph: NodeGraph,
   pub registry: NodeRegistry,
@@ -690,6 +699,8 @@ pub struct NodeGraphEditor {
 impl Default for NodeGraphEditor {
   fn default() -> Self {
     Self {
+      id: Uuid::new_v4(),
+      title: "Graph editor".to_string(),
       size: (900., 500.).into(),
       graph: Default::default(),
       registry: NodeRegistry::build(),
@@ -706,7 +717,8 @@ impl NodeGraphEditor {
   }
 
   pub fn show(&mut self, ctx: &egui::Context) {
-    egui::Window::new("Graph editor")
+    egui::Window::new(&self.title)
+      .id(egui::Id::new(&self.id))
       .default_size(self.size)
       .show(ctx, |ui| {
         egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {

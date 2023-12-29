@@ -69,6 +69,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
 #[derive(Default)]
 struct MyEguiApp {
   editor: NodeGraphEditor,
+  editor2: NodeGraphEditor,
 }
 
 impl MyEguiApp {
@@ -78,7 +79,11 @@ impl MyEguiApp {
     let (_size, graph) = build_graph(&reg, 2).expect("built graph");
     let mut editor = NodeGraphEditor::new();
     editor.graph = graph;
-    Self { editor }
+    let (_size, graph) = build_graph(&reg, 2).expect("built graph");
+    let mut editor2 = NodeGraphEditor::new();
+    editor2.graph = graph;
+    editor2.title = "Graph 2".to_string();
+    Self { editor, editor2 }
   }
 }
 
@@ -103,5 +108,6 @@ impl eframe::App for MyEguiApp {
       ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
     self.editor.show(ctx);
+    self.editor2.show(ctx);
   }
 }

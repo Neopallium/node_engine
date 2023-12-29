@@ -111,11 +111,10 @@ impl<T: ValueType> InputTyped<T> {
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, idx: u32, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) {
+  pub fn ui(&mut self, idx: usize, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) {
     ui.horizontal(|ui| {
       let connected = self.is_connected();
-      let input_id = NodeSocketId::input(0, id, idx, self.value.data_type());
-      ui.add(NodeSocket::new(input_id, connected, def.color));
+      ui.add(NodeSocket::input(id, idx, connected, def));
       if connected {
         ui.label(&def.name);
       } else {
@@ -134,7 +133,7 @@ impl<T: ValueType + Clone + Default> InputTyped<T> {
         let mut val = T::default();
         val.set_value(execution.eval_node(graph, *id)?)?;
         Ok(val)
-      },
+      }
       None => Ok(self.value.clone()),
     }
   }

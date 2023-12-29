@@ -473,11 +473,10 @@ pub struct OutputTyped<T> {
 #[cfg(feature = "egui")]
 impl<T: ValueType + Default> OutputTyped<T> {
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, idx: u32, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
+  pub fn ui(&mut self, idx: usize, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
     ui.horizontal(|ui| {
       ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let output_id = NodeSocketId::output(0, id, idx, T::default().data_type());
-        ui.add(NodeSocket::new(output_id, false, def.color));
+        ui.add(NodeSocket::output(id, idx, def));
         ui.label(&def.name);
       });
     });

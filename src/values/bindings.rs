@@ -47,7 +47,8 @@ impl ValueType for Color {
   fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     let changed = color_ui(ui, self.0.as_mut());
     let mut color = self.color();
-    let resp = color_picker::color_edit_button_rgba(ui, &mut color, color_picker::Alpha::BlendOrAdditive);
+    let resp =
+      color_picker::color_edit_button_rgba(ui, &mut color, color_picker::Alpha::BlendOrAdditive);
     if resp.changed() {
       self.set_color(color);
     }
@@ -287,6 +288,7 @@ impl ValueType for UV {
         ui.selectable_value(&mut self.1, UvChannel::UV2, "UV2");
         ui.selectable_value(&mut self.1, UvChannel::UV3, "UV3");
       })
-      .response.changed()
+      .response
+      .changed()
   }
 }

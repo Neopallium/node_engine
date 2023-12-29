@@ -147,7 +147,7 @@ pub trait NodeFrame: GetId {
 
   /// Render the node.
   fn render(&mut self, ui: &mut egui::Ui, offset: egui::Vec2) -> egui::Response {
-    let node_style = ui.node_style();
+    let node_style = NodeStyle::get(ui);
     let zoom = node_style.zoom;
     // Zoom and translate frame to Screen space.
     let mut rect = self.rect();
