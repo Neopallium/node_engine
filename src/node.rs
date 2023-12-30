@@ -50,7 +50,7 @@ impl OutputId {
   }
 }
 
-pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
+pub trait NodeImpl: fmt::Debug + erased_serde::Serialize + Send + Sync {
   fn clone_node(&self) -> Box<dyn NodeImpl>;
 
   fn def(&self) -> &NodeDefinition;
@@ -141,84 +141,13 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
   }
 
   #[cfg(feature = "egui")]
-  fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
-    let mut input_changed = None;
-    for (idx, (name, def)) in self.def().inputs.iter().enumerate() {
-      ui.horizontal(|ui| {
-        let input_key = InputKey::from(idx as u32);
-        let (connected, value) = match self.get_node_input(&input_key) {
-          Ok(Input::Value(val)) => (false, Some(val)),
-          Ok(Input::Connect(_, _)) => (true, None),
-          Ok(Input::Disconnect) => (false, None),
-          Err(err) => {
-            ui.label(format!("Invalid input: {err:?}"));
-            return;
-          }
-        };
-        ui.add(NodeSocket::input(id, idx, connected, def));
-        if connected {
-          ui.label(name);
-        } else {
-          ui.collapsing(name, |ui| {
-            if let Some(mut value) = value {
-              if value.ui(ui) {
-                input_changed = Some((input_key, value));
-              }
-            }
-          });
-        }
-      });
-    }
-    if let Some((input_key, value)) = input_changed {
-      if let Err(err) = self.set_node_input(&input_key, value.into()) {
-        log::error!("Failed to update node input: {err:?}");
-      }
-      true
-    } else {
-      false
-    }
-  }
+  fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool;
 
   #[cfg(feature = "egui")]
-  fn parameters_ui(&mut self, ui: &mut egui::Ui, _id: NodeId) -> bool {
-    let mut parameter_changed = None;
-    for (name, def) in &self.def().parameters {
-      ui.horizontal(|ui| {
-        let mut value = match self.get_param(name) {
-          Ok(val) => val,
-          Err(err) => {
-            ui.label(format!("Invalid parameter: {err:?}"));
-            return;
-          }
-        };
-        ui.label(name);
-        if def.ui(ui, &mut value) {
-          parameter_changed = Some((name.to_string(), value));
-        }
-      });
-    }
-    if let Some((name, value)) = parameter_changed {
-      if let Err(err) = self.set_param(&name, value.into()) {
-        log::error!("Failed to update node parameter: {err:?}");
-      }
-      true
-    } else {
-      false
-    }
-  }
+  fn parameters_ui(&mut self, ui: &mut egui::Ui, _id: NodeId) -> bool;
 
   #[cfg(feature = "egui")]
-  fn outputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
-    for (idx, (name, def)) in self.def().outputs.iter().enumerate() {
-      ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-          ui.add(NodeSocket::output(id, idx, def));
-          ui.label(name);
-        });
-      });
-    }
-    false
-  }
+  fn outputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool;
 }
 
 impl Serialize for dyn NodeImpl {

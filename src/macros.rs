@@ -10,7 +10,7 @@ macro_rules! impl_enum_parameter_type {
   }) => {
     $(#[$param_enum_meta])*
     #[derive(Copy, Clone, Debug, Default)]
-    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive($crate::serde::Serialize, $crate::serde::Deserialize)]
     pub enum $param_enum_name {
       #[default]
       $(
@@ -576,12 +576,12 @@ macro_rules! impl_node {
     mod $mod_name {
       use super::*;
 
-      lazy_static::lazy_static! {
+      $crate::lazy_static::lazy_static! {
         pub static ref DEFINITION: $crate::NodeDefinition = {
           // Use the module_path to generate the node definition id.
           let path = module_path!();
           let mut def = $crate::NodeDefinition::new($node_name, path, |_, data| {
-            use serde::Deserialize;
+            use $crate::serde::Deserialize;
             Ok(Box::new(match data {
               Some(data) => $node_ty_name::deserialize(data)?,
               None => $node_ty_name::new(),
@@ -613,7 +613,7 @@ macro_rules! impl_node {
           $(
             $(
               {
-                use heck::ToTitleCase;
+                use $crate::heck::ToTitleCase;
                 let name = stringify!($field_input_name).to_title_case();
                 def.set_input_color(&name, Some($field_input_color));
               }
@@ -622,7 +622,7 @@ macro_rules! impl_node {
           $(
             $(
               {
-                use heck::ToTitleCase;
+                use $crate::heck::ToTitleCase;
                 let name = stringify!($field_output_name).to_title_case();
                 def.set_output_color(&name, Some($field_output_color));
               }
@@ -640,7 +640,7 @@ macro_rules! impl_node {
 
       $(#[$node_struct_attr])*
       #[derive(Clone, Debug)]
-      #[derive(serde::Serialize, serde::Deserialize)]
+      #[derive($crate::serde::Serialize, $crate::serde::Deserialize)]
       pub struct $node_ty_name {
         $( $node_struct_fields )*
       }

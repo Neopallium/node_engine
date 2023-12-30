@@ -235,7 +235,7 @@ impl RegisterNode {
 #[macro_export]
 macro_rules! register_node {
   ($($definition:tt)*) => {
-    inventory::submit! {
+    $crate::inventory::submit! {
       $crate::RegisterNode::new(|| {
         $($definition)*
       })
