@@ -18,7 +18,7 @@ pub struct EditorState {
   zoom: f32,
   scroll_offset: emath::Vec2,
   #[serde(skip)]
-  current_pos: emath::Vec2,
+  current_pos: Option<emath::Vec2>,
 }
 
 impl Default for EditorState {
@@ -30,7 +30,7 @@ impl Default for EditorState {
       origin,
       zoom: 0.5,
       scroll_offset: origin - emath::vec2(450., 250.),
-      current_pos: Default::default(),
+      current_pos: None,
     }
   }
 }
@@ -213,7 +213,7 @@ impl NodeGraph {
   }
 
   /// Returns the `changed` counter to detect when the graph needs to be recompiled.
-  pub fn changed(&self) -> usize {
+  pub fn changed_counter(&self) -> usize {
     self.changed
   }
 
@@ -224,6 +224,9 @@ impl NodeGraph {
 
   pub fn add(&mut self, mut node: Node) -> NodeId {
     self.updated();
+    if let Some(position) = &self.editor.current_pos {
+      node.set_position(*position);
+    }
     // Check for duplicate node ids.
     if self.contains(node.id()) {
       node.new_id();
@@ -456,7 +459,7 @@ impl NodeGraph {
       if let Some(pos) = ui.ctx().pointer_latest_pos() {
         pointer_pos = pos;
         if ui.ui_contains_pointer() {
-          self.editor.current_pos = (pos - origin).to_vec2() / zoom;
+          self.editor.current_pos = Some((pos - origin).to_vec2() / zoom);
         }
       }
       // When not scrolling, detect click and drag to select nodes.
@@ -621,7 +624,6 @@ pub struct NodeGraphEditor {
   pub graph: NodeGraph,
   pub registry: NodeRegistry,
   pub node_filter: NodeFilter,
-  next_position: Option<emath::Vec2>,
 }
 
 #[cfg(feature = "egui")]
@@ -633,7 +635,6 @@ impl Default for NodeGraphEditor {
       graph: Default::default(),
       registry: NodeRegistry::build(),
       node_filter: Default::default(),
-      next_position: None,
     }
   }
 }
@@ -659,16 +660,10 @@ impl NodeGraphEditor {
         if let Some(resp) = out.inner {
           // Graph menu.
           resp.context_menu(|ui| {
-            if self.next_position.is_none() {
-              self.next_position = Some(self.graph.editor.current_pos);
-            }
             ui.menu_button("Create node", |ui| {
               // Node filter UI.
               self.node_filter.ui(ui);
-              if let Some(mut node) = self.registry.ui(ui, &self.node_filter) {
-                if let Some(position) = self.next_position.take() {
-                  node.set_position(position);
-                }
+              if let Some(node) = self.registry.ui(ui, &self.node_filter) {
                 self.graph.add(node);
                 ui.close_menu();
               }

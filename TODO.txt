@@ -1,0 +1,9 @@
+* Graph properties (inputs).
+* Replace use of `anyhow` with error type.
+* `NodeKind` - Define root/master, sub-graph, input, output, etc...
+* Texture 2D, etc...
+* Dynamic Vector/Matrix
+* Promoting/Truncating Vector/f32 types (non-dynamic).
+* Sub-graphs
+* Click connections (context menu).
+* Keywords

@@ -1,4 +1,4 @@
-use glam::{Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec4};
 
 use anyhow::Result;
 
@@ -17,18 +17,8 @@ impl_node! {
     pub struct TextureNode {
       /// UV.
       pub uv: Input<UV>,
-      /// Texture. TODO: implement.
-      pub tex: Input<f32>,
-      /// RGB value.
-      pub rgb: Output<Vec3> Color("WHITE"),
-      /// Red value.
-      pub red: Output<f32> Color("RED"),
-      /// Green value.
-      pub green: Output<f32> Color("GREEN"),
-      /// Blue value.
-      pub blue: Output<f32> Color("BLUE"),
-      /// Alpha value.
-      pub alpha: Output<f32> Color("WHITE"),
+      /// Texture.
+      pub tex: Input<Texture2DHandle>,
       /// RGBA value.
       pub rgba: Output<Vec4> Color("WHITE"),
     }

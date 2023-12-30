@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use indexmap::IndexMap;
+
 use anyhow::{anyhow, Result};
 
 use crate::graph::*;
@@ -52,7 +54,7 @@ impl CodeBlock {
 #[derive(Default, Debug)]
 pub struct NodeGraphCompile {
   next_id: CodeBlockId,
-  blocks: HashMap<CodeBlockId, CodeBlock>,
+  blocks: IndexMap<CodeBlockId, CodeBlock>,
   names: HashMap<String, CodeBlockId>,
   block_order: Vec<CodeBlockId>,
   stack: Vec<CodeBlockId>,

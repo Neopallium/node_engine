@@ -24,10 +24,10 @@ env_logger = "0.10"
 lazy_static = "1.4.0"
 thiserror = "1.0"
 
-emath = { version = "0.24", features = ["serde"] }
-ecolor = { version = "0.24", features = ["serde"] }
-egui = { version = "0.24", optional = true }
-egui_extras = { version = "0.24", optional = true }
+emath = { version = "0.24", default-features = false, features = ["serde"] }
+ecolor = { version = "0.24", default-features = false, features = ["serde"] }
+egui = { version = "0.24", optional = true, default-features = false }
+egui_extras = { version = "0.24", optional = true, default-features = false }
 hex = "0.4"
 
 serde = { version = "1", features = ["derive", "rc"] }
