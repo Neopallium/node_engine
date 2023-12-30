@@ -314,7 +314,9 @@ pub trait NodeFrame: GetId {
     if self.auto_size() {
       // Update frame size.
       let size = ui.min_rect().size() / zoom;
-      if self.rect().size() != size {
+      let diff = (self.rect().size() - size).abs().max_elem();
+      if diff >= 0.1 {
+        eprintln!("update node size: old={:?}, new={:?}, diff={diff:?}", self.rect().size(), size);
         state.updated = true;
         if action.is_none() {
           action = Some(NodeAction::Resize);
