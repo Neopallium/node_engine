@@ -90,8 +90,8 @@ impl eframe::App for MyEguiApp {
   fn save(&mut self, _storage: &mut dyn eframe::Storage) {
     let json = serde_json::to_string_pretty(&self.editor.graph);
     match json {
-      Ok(json) => {
-        eprintln!("graph.json = {json}");
+      Ok(_json) => {
+        //eprintln!("graph.json = {json}");
         /*
         // Try round-trip.
         let graph: NodeGraph = serde_json::from_str(&json).expect("should decode");

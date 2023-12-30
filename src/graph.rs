@@ -621,9 +621,13 @@ impl NodeGraphEditor {
     egui::Window::new(&self.title)
       .default_size(self.size)
       .show(ctx, |ui| {
-        egui::SidePanel::right("graph_right_panel").show_inside(ui, |ui| {
-          ui.label("TODO: Node finder here");
-        });
+        // HACK: Without this side panel, the central panel will not work with a ScrollArea.
+        egui::SidePanel::right("graph_right_panel")
+          .min_width(0.)
+          .frame(egui::Frame::none())
+          .show_separator_line(false)
+          .show_inside(ui, |_ui| {});
+
         let out = egui::CentralPanel::default().show_inside(ui, |ui| self.graph.ui(ui));
         if let Some(resp) = out.inner {
           // Graph menu.
