@@ -155,6 +155,8 @@ pub struct NodeGraph {
   connections: ConnectionMap,
   output: Option<NodeId>,
   #[serde(skip)]
+  changed: usize,
+  #[serde(skip)]
   #[cfg(feature = "egui")]
   ui_state: NodeGraphMeta,
 }
@@ -210,7 +212,18 @@ impl NodeGraph {
     }
   }
 
+  /// Returns the `changed` counter to detect when the graph needs to be recompiled.
+  pub fn changed(&self) -> usize {
+    self.changed
+  }
+
+  // Inc. the `changed` counter to detect when the graph needs to be recompiled.
+  fn updated(&mut self) {
+    self.changed += 1;
+  }
+
   pub fn add(&mut self, mut node: Node) -> NodeId {
+    self.updated();
     // Check for duplicate node ids.
     if self.contains(node.id()) {
       node.new_id();
@@ -221,6 +234,7 @@ impl NodeGraph {
   }
 
   pub fn remove(&mut self, id: NodeId) -> Option<Node> {
+    self.updated();
     // Remove all connections to the node.
     self.connections.0.retain(|input, output| {
       if output.node() == id {
@@ -278,18 +292,23 @@ impl NodeGraph {
       .ok_or_else(|| anyhow!("Missing node: {id:?}"))?;
     // Convert Input key to id.
     let input_id = node.get_input_idx(&key).map(|idx| InputId::new(id, idx))?;
-    // Set the node input.
-    let old = node.set_input(key, value.clone())?;
     // Update connections.
     match &value {
       Input::Disconnect => {
-        self.connections.0.remove(&input_id);
+        if self.connections.0.remove(&input_id).is_none() {
+          // The input was already disconnected.  No change.
+          return Ok(None);
+        }
       }
       Input::Connect(output_id, _) => {
         self.connections.0.insert(input_id, *output_id);
       }
       _ => {}
     }
+    // Set the node input.
+    let old = node.set_input(key, value.clone())?;
+    // Mark graph as updated.
+    self.updated();
     Ok(old)
   }
 
@@ -316,6 +335,7 @@ impl NodeGraph {
   }
 
   pub fn get_mut(&mut self, id: NodeId) -> Result<&mut Node> {
+    self.updated();
     self
       .nodes
       .0
@@ -324,6 +344,7 @@ impl NodeGraph {
   }
 
   pub fn set_output(&mut self, output: Option<NodeId>) {
+    self.updated();
     self.output = output;
   }
 
@@ -483,6 +504,7 @@ impl NodeGraph {
       // Render nodes.
       let mut remove_node = None;
       let mut resize_groups = BTreeSet::new();
+      let mut updated = false;
       for (node_id, node) in &mut self.nodes.0 {
         match state.render(ui, node) {
           Some(NodeAction::Dragged(_) | NodeAction::Resize) => {
@@ -498,6 +520,11 @@ impl NodeGraph {
           }
           None => (),
         }
+        updated |= node.updated;
+      }
+      // Check if any of the nodes have been updated.
+      if updated {
+        self.updated();
       }
       // Handle node actions.
       if let Some(node_id) = remove_node {

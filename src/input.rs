@@ -111,7 +111,8 @@ impl<T: ValueType> InputTyped<T> {
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, idx: usize, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) {
+  pub fn ui(&mut self, idx: usize, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) -> bool {
+    let mut changed = false;
     ui.horizontal(|ui| {
       let connected = self.is_connected();
       ui.add(NodeSocket::input(id, idx, connected, def));
@@ -119,10 +120,11 @@ impl<T: ValueType> InputTyped<T> {
         ui.label(&def.name);
       } else {
         ui.collapsing(&def.name, |ui| {
-          self.value.ui(ui);
+          changed = self.value.ui(ui);
         });
       }
     });
+    changed
   }
 }
 

@@ -366,7 +366,7 @@ pub trait ParameterType {
   fn parameter_data_type() -> ParameterDataType;
 
   #[cfg(feature = "egui")]
-  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId) {
+  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId) -> bool {
     ui.horizontal(|ui| {
       let mut value = self.get_param();
       ui.label(&def.name);
@@ -374,8 +374,12 @@ pub trait ParameterType {
         if let Err(err) = self.set_param(value) {
           log::error!("Failed to update node parameter: {err:?}");
         }
+        true
+      } else {
+        false
       }
-    });
+    })
+    .inner
   }
 }
 

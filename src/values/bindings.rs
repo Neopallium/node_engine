@@ -283,12 +283,13 @@ impl ValueType for UV {
     egui::ComboBox::from_id_source("UV Channel")
       .selected_text(format!("{:?}", self.1))
       .show_ui(ui, |ui| {
-        ui.selectable_value(&mut self.1, UvChannel::UV0, "UV0");
-        ui.selectable_value(&mut self.1, UvChannel::UV1, "UV1");
-        ui.selectable_value(&mut self.1, UvChannel::UV2, "UV2");
-        ui.selectable_value(&mut self.1, UvChannel::UV3, "UV3");
+        ui.selectable_value(&mut self.1, UvChannel::UV0, "UV0")
+          | ui.selectable_value(&mut self.1, UvChannel::UV1, "UV1")
+          | ui.selectable_value(&mut self.1, UvChannel::UV2, "UV2")
+          | ui.selectable_value(&mut self.1, UvChannel::UV3, "UV3")
       })
-      .response
-      .changed()
+      .inner
+      .map(|resp| resp.changed())
+      .unwrap_or_default()
   }
 }

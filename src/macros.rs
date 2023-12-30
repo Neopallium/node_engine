@@ -714,33 +714,42 @@ macro_rules! impl_node {
         }
 
         #[cfg(feature = "egui")]
-        fn inputs_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) {
+        fn inputs_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) -> bool {
           let mut _defs = DEFINITION.inputs.values().enumerate();
+          let mut _updated = false;
           $(
             if let Some((idx, def)) = _defs.next() {
-              self.$field_input_name.ui(idx, def, _ui, _id);
+              if self.$field_input_name.ui(idx, def, _ui, _id) {
+                _updated = true;
+              }
             }
           )*
+          _updated
         }
 
         #[cfg(feature = "egui")]
-        fn outputs_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) {
+        fn outputs_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) -> bool {
           let mut _defs = DEFINITION.outputs.values().enumerate();
           $(
             if let Some((idx, def)) = _defs.next() {
               self.$field_output_name.ui(idx, def, _ui, _id);
             }
           )*
+          false
         }
 
         #[cfg(feature = "egui")]
-        fn parameters_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) {
+        fn parameters_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) -> bool {
           let mut _defs = DEFINITION.parameters.values();
+          let mut _updated = false;
           $(
             if let Some(def) = _defs.next() {
-              self.$field_param_name.parameter_ui(def, _ui, _id);
+              if self.$field_param_name.parameter_ui(def, _ui, _id) {
+                _updated = true;
+              }
             }
           )*
+          _updated
         }
 
         $( $ty_node_impl_fns )*

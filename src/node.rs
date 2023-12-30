@@ -101,18 +101,21 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
+  fn ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
     let def = self.def();
     let input_count = def.inputs.len();
     let output_count = def.outputs.len();
     let param_count = def.parameters.len();
     let node_style = NodeStyle::get(ui);
     let zoom = node_style.zoom;
+    let mut updated = false;
     ui.vertical(|ui| {
       ui.horizontal(|ui| {
         if input_count > 0 {
           ui.vertical(|ui| {
-            self.inputs_ui(ui, id);
+            if self.inputs_ui(ui, id) {
+              updated = true;
+            }
           });
         }
         if output_count > 0 {
@@ -121,19 +124,24 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
           }
           ui.vertical(|ui| {
             ui.set_min_width(50.0 * zoom);
-            self.outputs_ui(ui, id);
+            if self.outputs_ui(ui, id) {
+              updated = true;
+            }
           });
         }
       });
       if param_count > 0 {
         ui.separator();
-        self.parameters_ui(ui, id);
+        if self.parameters_ui(ui, id) {
+          updated = true;
+        }
       }
     });
+    updated
   }
 
   #[cfg(feature = "egui")]
-  fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
+  fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
     let mut input_changed = None;
     for (idx, (name, def)) in self.def().inputs.iter().enumerate() {
       ui.horizontal(|ui| {
@@ -165,11 +173,14 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
       if let Err(err) = self.set_node_input(&input_key, value.into()) {
         log::error!("Failed to update node input: {err:?}");
       }
+      true
+    } else {
+      false
     }
   }
 
   #[cfg(feature = "egui")]
-  fn parameters_ui(&mut self, ui: &mut egui::Ui, _id: NodeId) {
+  fn parameters_ui(&mut self, ui: &mut egui::Ui, _id: NodeId) -> bool {
     let mut parameter_changed = None;
     for (name, def) in &self.def().parameters {
       ui.horizontal(|ui| {
@@ -190,11 +201,14 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
       if let Err(err) = self.set_param(&name, value.into()) {
         log::error!("Failed to update node parameter: {err:?}");
       }
+      true
+    } else {
+      false
     }
   }
 
   #[cfg(feature = "egui")]
-  fn outputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) {
+  fn outputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
     for (idx, (name, def)) in self.def().outputs.iter().enumerate() {
       ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -203,6 +217,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize {
         });
       });
     }
+    false
   }
 }
 
@@ -258,7 +273,7 @@ pub struct Node {
   node: Box<dyn NodeImpl>,
   pub area: emath::Rect,
   #[serde(skip)]
-  updated: bool,
+  pub updated: bool,
 }
 
 impl GetId for Node {
@@ -392,7 +407,9 @@ impl NodeFrame for Node {
       .fill(egui::Color32::from_gray(63))
       .show(ui, |ui| {
         ui.set_min_width(node_style.node_min_size.x);
-        self.node.ui(ui, self.id);
+        if self.node.ui(ui, self.id) {
+          self.updated = true;
+        }
       });
   }
 
