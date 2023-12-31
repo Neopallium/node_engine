@@ -1,9 +1,5 @@
-use glam::{Mat2, Mat3, Mat4, Vec2, Vec3, Vec4};
+use anyhow::Result;
 
-use anyhow::{anyhow, Result};
-
-#[cfg(feature = "egui")]
-use crate::ui::*;
 use crate::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -11,6 +7,7 @@ pub enum DataTypeClass {
   Scalar,
   Vector,
   Matrix,
+  Dynamic,
   Texture,
 }
 
@@ -25,6 +22,9 @@ pub enum DataType {
   Mat2,
   Mat3,
   Mat4,
+  Dynamic,
+  DynamicVector,
+  DynamicMatrix,
   Texture2D,
   Texture2DArray,
   Texture3D,
@@ -32,7 +32,18 @@ pub enum DataType {
 }
 
 impl DataType {
-  pub fn class(&self) -> DataTypeClass {
+  /// Is this data type dynamic.
+  pub const fn is_dynamic(&self) -> bool {
+    match self {
+      Self::Dynamic => true,
+      Self::DynamicVector => true,
+      Self::DynamicMatrix => true,
+      _ => false,
+    }
+  }
+
+  /// Returns the data types class.
+  pub const fn class(&self) -> DataTypeClass {
     match self {
       Self::I32 => DataTypeClass::Scalar,
       Self::U32 => DataTypeClass::Scalar,
@@ -43,6 +54,9 @@ impl DataType {
       Self::Mat2 => DataTypeClass::Matrix,
       Self::Mat3 => DataTypeClass::Matrix,
       Self::Mat4 => DataTypeClass::Matrix,
+      Self::Dynamic => DataTypeClass::Dynamic,
+      Self::DynamicVector => DataTypeClass::Vector,
+      Self::DynamicMatrix => DataTypeClass::Matrix,
       Self::Texture2D => DataTypeClass::Texture,
       Self::Texture2DArray => DataTypeClass::Texture,
       Self::Texture3D => DataTypeClass::Texture,
@@ -50,6 +64,7 @@ impl DataType {
     }
   }
 
+  /// Get the default value for this data type.
   pub fn default_value(&self) -> Value {
     match self {
       Self::I32 => Value::I32(Default::default()),
@@ -61,6 +76,9 @@ impl DataType {
       Self::Mat2 => Value::Mat2(Default::default()),
       Self::Mat3 => Value::Mat3(Default::default()),
       Self::Mat4 => Value::Mat4(Default::default()),
+      Self::Dynamic => Value::Vec4(Default::default()),
+      Self::DynamicVector => Value::Vec4(Default::default()),
+      Self::DynamicMatrix => Value::Mat4(Default::default()),
       Self::Texture2D => Value::Texture2D(Default::default()),
       Self::Texture2DArray => Value::Texture2DArray(Default::default()),
       Self::Texture3D => Value::Texture3D(Default::default()),
@@ -68,8 +86,9 @@ impl DataType {
     }
   }
 
+  /// Get the default port/connection color for this data type.
   #[cfg(feature = "egui")]
-  pub fn color(&self) -> egui::Color32 {
+  pub const fn color(&self) -> egui::Color32 {
     match self {
       Self::I32 => egui::Color32::LIGHT_BLUE,
       Self::U32 => egui::Color32::LIGHT_BLUE,
@@ -80,6 +99,9 @@ impl DataType {
       Self::Mat2 => egui::Color32::BLUE,
       Self::Mat3 => egui::Color32::BLUE,
       Self::Mat4 => egui::Color32::BLUE,
+      Self::Dynamic => egui::Color32::BLUE,
+      Self::DynamicVector => egui::Color32::LIGHT_BLUE,
+      Self::DynamicMatrix => egui::Color32::BLUE,
       Self::Texture2D => egui::Color32::RED,
       Self::Texture2DArray => egui::Color32::RED,
       Self::Texture3D => egui::Color32::RED,
@@ -87,17 +109,37 @@ impl DataType {
     }
   }
 
+  /// Check if the data type is compatible.
   pub fn is_compatible(&self, other: &DataType) -> bool {
     if self == other {
-      // Same type is compatible.
-      true
-    } else if self.class() == other.class() {
-      // Same class is compatible.
+      // Same data types are compatible.
       true
     } else {
       match (self.class(), other.class()) {
-        (DataTypeClass::Scalar, DataTypeClass::Vector)
-        | (DataTypeClass::Vector, DataTypeClass::Scalar) => true,
+        (class, other) if class == other => match class {
+          // Matrix types must have the same size.
+          DataTypeClass::Matrix => false,
+          _ => true,
+        },
+        (DataTypeClass::Dynamic, other) | (other, DataTypeClass::Dynamic) => match other {
+          DataTypeClass::Scalar => true,
+          DataTypeClass::Vector => true,
+          DataTypeClass::Matrix => true,
+          DataTypeClass::Dynamic => true,
+          _ => false,
+        },
+        (DataTypeClass::Vector, other) | (other, DataTypeClass::Vector) => match other {
+          DataTypeClass::Scalar => true,
+          DataTypeClass::Vector => true,
+          DataTypeClass::Dynamic => true,
+          _ => false,
+        },
+        (DataTypeClass::Matrix, other) | (other, DataTypeClass::Matrix) => match other {
+          DataTypeClass::Dynamic => true,
+          // Matrix types must have the same size.
+          DataTypeClass::Matrix => false,
+          _ => false,
+        },
         _ => false,
       }
     }
@@ -113,6 +155,10 @@ pub trait ValueType: core::fmt::Debug {
 
   fn data_type(&self) -> DataType;
 
+  fn is_dynamic(&self) -> bool {
+    self.data_type().is_dynamic()
+  }
+
   fn binding(&self) -> Option<&str> {
     None
   }
@@ -127,459 +173,5 @@ pub trait ValueType: core::fmt::Debug {
 impl Clone for Box<dyn ValueType> {
   fn clone(&self) -> Self {
     self.clone_value()
-  }
-}
-
-impl ValueType for i32 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::I32(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::I32(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a I32 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::I32
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    ui.add(egui::DragValue::new(self).speed(1)).changed()
-  }
-}
-
-impl ValueType for u32 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::U32(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::U32(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a U32 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::U32
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    ui.add(egui::DragValue::new(self).speed(1)).changed()
-  }
-}
-
-impl ValueType for f32 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::F32(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::F32(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a F32 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::F32
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    ui.add(egui::DragValue::new(self).speed(0.1)).changed()
-  }
-}
-
-impl ValueType for Texture2DHandle {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Texture2D(self.clone())
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Texture2D(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Texture2D got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Texture2D
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    ui.label("Texture2D");
-    false
-  }
-}
-
-impl ValueType for Texture2DArrayHandle {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Texture2DArray(self.clone())
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Texture2DArray(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Texture2DArray got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Texture2DArray
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    ui.label("Texture2DArray");
-    false
-  }
-}
-
-impl ValueType for Texture3DHandle {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Texture3D(self.clone())
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Texture3D(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Texture3D got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Texture3D
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    ui.label("Texture3D");
-    false
-  }
-}
-
-impl ValueType for CubemapHandle {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Cubemap(self.clone())
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Cubemap(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Cubemap got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Cubemap
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    ui.label("Cubemap");
-    false
-  }
-}
-
-#[cfg(feature = "egui")]
-const COLUMNS: [&str; 4] = ["X", "Y", "Z", "W"];
-#[cfg(feature = "egui")]
-const COLOR_COLUMNS: [&str; 4] = ["R", "G", "B", "A"];
-
-#[cfg(feature = "egui")]
-pub(crate) fn f32_table_ui(
-  ui: &mut egui::Ui,
-  columns: &[&str],
-  rows: usize,
-  values: &mut [f32],
-  range: Option<(f32, f32)>,
-) -> bool {
-  use egui_extras::{Column, TableBuilder};
-
-  let node_style = NodeStyle::get(ui);
-  let mut changed = false;
-  let height = 20.0 * node_style.zoom;
-  let width = 40.0 * node_style.zoom;
-
-  // Allocate space for the table.
-  ui.set_min_height(height * (rows + 1) as f32);
-
-  // Make sure the layout is in vertical mode.
-  ui.vertical(|ui| {
-    TableBuilder::new(ui)
-      .columns(Column::exact(width), columns.len())
-      .vscroll(false)
-      .header(height, |mut header| {
-        for col in columns {
-          header.col(|ui| {
-            ui.heading(*col);
-          });
-        }
-      })
-      .body(|body| {
-        body.rows(height, rows, |row_index, mut row| {
-          for col in 0..columns.len() {
-            row.col(|ui| {
-              let val = &mut values[col * rows + row_index];
-              let drag = if let Some((min, max)) = range {
-                egui::DragValue::new(val).speed(0.1).clamp_range(min..=max)
-              } else {
-                egui::DragValue::new(val).speed(0.1)
-              };
-              if ui.add(drag).changed() {
-                changed = true;
-              }
-            });
-          }
-        });
-      });
-  });
-  changed
-}
-
-#[cfg(feature = "egui")]
-pub(crate) fn vector_ui(ui: &mut egui::Ui, values: &mut [f32]) -> bool {
-  let len = values.len();
-  f32_table_ui(ui, &COLUMNS[0..len], 1, values, None)
-}
-
-#[cfg(feature = "egui")]
-pub(crate) fn color_ui(ui: &mut egui::Ui, values: &mut [f32]) -> bool {
-  let len = values.len();
-  f32_table_ui(ui, &COLOR_COLUMNS[0..len], 1, values, Some((0., 1.)))
-}
-
-#[cfg(feature = "egui")]
-pub(crate) fn matrix_ui(ui: &mut egui::Ui, dim: usize, values: &mut [f32]) -> bool {
-  f32_table_ui(ui, &COLUMNS[0..dim], dim, values, None)
-}
-
-impl ValueType for Vec2 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Vec2(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Vec2(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Vec2 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Vec2
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    vector_ui(ui, self.as_mut())
-  }
-}
-
-impl ValueType for Vec3 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Vec3(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Vec3(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Vec3 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Vec3
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    vector_ui(ui, self.as_mut())
-  }
-}
-
-impl ValueType for Vec4 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Vec4(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Vec4(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Vec4 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Vec4
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    vector_ui(ui, self.as_mut())
-  }
-}
-
-impl ValueType for Mat2 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Mat2(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Mat2(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Mat2 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Mat2
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    matrix_ui(ui, 2, &mut self.as_mut()[..])
-  }
-}
-
-impl ValueType for Mat3 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Mat3(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Mat3(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Mat3 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Mat3
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    matrix_ui(ui, 3, &mut self.as_mut()[..])
-  }
-}
-
-impl ValueType for Mat4 {
-  fn clone_value(&self) -> Box<dyn ValueType> {
-    Box::new(self.clone())
-  }
-
-  fn to_value(&self) -> Value {
-    Value::Mat4(*self)
-  }
-
-  fn set_value(&mut self, value: Value) -> Result<()> {
-    match value {
-      Value::Mat4(v) => {
-        *self = v;
-        Ok(())
-      }
-      _ => Err(anyhow!("Expected a Mat4 got: {value:?}")),
-    }
-  }
-
-  fn data_type(&self) -> DataType {
-    DataType::Mat4
-  }
-
-  #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    matrix_ui(ui, 4, &mut self.as_mut()[..])
   }
 }

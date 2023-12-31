@@ -15,6 +15,18 @@ use crate::*;
 pub mod types;
 pub use types::*;
 
+pub mod vector;
+pub use vector::*;
+
+pub mod scalar;
+pub use scalar::*;
+
+pub mod matrix;
+pub use matrix::*;
+
+pub mod texture;
+pub use texture::*;
+
 pub mod bindings;
 pub use bindings::*;
 
