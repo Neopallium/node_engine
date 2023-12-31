@@ -23,13 +23,13 @@ pub mod nodes;
 
 // pre-export for use in `impl_node` macro.
 #[doc(hidden)]
-pub extern crate serde;
-#[doc(hidden)]
 pub extern crate heck;
 #[doc(hidden)]
 pub extern crate inventory;
 #[doc(hidden)]
 pub extern crate lazy_static;
+#[doc(hidden)]
+pub extern crate serde;
 
 #[cfg(feature = "egui")]
 pub mod ui;

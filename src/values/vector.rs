@@ -351,26 +351,26 @@ impl ValueType for Dynamic {
 
   fn set_value(&mut self, value: Value) -> Result<()> {
     match &value {
-      Value::I32(_) |
-      Value::U32(_) |
-      Value::F32(_) |
-      Value::Vec2(_) |
-      Value::Vec3(_) |
-      Value::Vec4(_) => {
+      Value::I32(_)
+      | Value::U32(_)
+      | Value::F32(_)
+      | Value::Vec2(_)
+      | Value::Vec3(_)
+      | Value::Vec4(_) => {
         let mut v = DynamicVector::default();
         v.set_value(value)?;
         *self = Self::Vector(v);
         Ok(())
       }
-      Value::Mat2(_) |
-      Value::Mat3(_) |
-      Value::Mat4(_) => {
+      Value::Mat2(_) | Value::Mat3(_) | Value::Mat4(_) => {
         let mut m = DynamicMatrix::default();
         m.set_value(value)?;
         *self = Self::Matrix(m);
         Ok(())
       }
-      _ => Err(anyhow!("Expected a Dynamic Vector or Matrix got: {value:?}")),
+      _ => Err(anyhow!(
+        "Expected a Dynamic Vector or Matrix got: {value:?}"
+      )),
     }
   }
 

@@ -1,4 +1,4 @@
-use glam::{Vec4Swizzles, Mat2, Mat3, Mat4};
+use glam::{Mat2, Mat3, Mat4, Vec4Swizzles};
 
 use anyhow::{anyhow, Result};
 
@@ -116,7 +116,7 @@ impl ValueType for DynamicMatrix {
       DynamicSize::D1 => {
         // This case shouldn't be possible here.
         panic!("This shouldn't be possible.");
-      },
+      }
       DynamicSize::D2 => Value::Mat2(Mat2::from_cols(
         self.data.x_axis.xy(),
         self.data.y_axis.xy(),
@@ -164,19 +164,16 @@ impl ValueType for DynamicMatrix {
         // This case shouldn't be possible here.
         ui.label("INVALID MATRIX");
         false
-      },
+      }
       DynamicSize::D2 => {
-        let mut mat2 = Mat2::from_cols(
-          self.data.x_axis.xy(),
-          self.data.y_axis.xy(),
-        );
+        let mut mat2 = Mat2::from_cols(self.data.x_axis.xy(), self.data.y_axis.xy());
         if matrix_ui(ui, 2, &mut mat2.as_mut()[..]) {
           self.data = Mat4::from_mat3(Mat3::from_mat2(mat2));
           true
         } else {
           false
         }
-      },
+      }
       DynamicSize::D3 => {
         let mut mat3 = Mat3::from_mat4(self.data);
         if matrix_ui(ui, 3, &mut mat3.as_mut()[..]) {
@@ -185,10 +182,8 @@ impl ValueType for DynamicMatrix {
         } else {
           false
         }
-      },
-      DynamicSize::D4 => {
-        matrix_ui(ui, 4, &mut self.data.as_mut()[..])
-      },
+      }
+      DynamicSize::D4 => matrix_ui(ui, 4, &mut self.data.as_mut()[..]),
     }
   }
 }
