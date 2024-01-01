@@ -7,7 +7,7 @@ use crate::*;
 impl_node! {
   mod split_node {
     NodeInfo {
-      name: "Split Node",
+      name: "Split",
       description: "Split the input vector into it's components.",
       category: ["Channel"],
     }
@@ -48,7 +48,7 @@ impl_node! {
 impl_node! {
   mod combine_node {
     NodeInfo {
-      name: "Combine Node",
+      name: "Combine",
       description: "Combine components into a vector.",
       category: ["Channel"],
     }

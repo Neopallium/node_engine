@@ -43,7 +43,7 @@ impl_node! {
 impl_node! {
   mod uv_node {
     NodeInfo {
-      name: "UV Node",
+      name: "UV",
       description: "Vertex or Fragment UV",
       category: ["UV"],
     }
@@ -77,7 +77,7 @@ impl_node! {
 impl_node! {
   mod fragment_output_node {
     NodeInfo {
-      name: "Fragment output",
+      name: "Fragment",
       description: "Fragment shader node",
       category: ["Output"],
     }
