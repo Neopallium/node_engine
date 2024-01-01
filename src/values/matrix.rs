@@ -153,8 +153,16 @@ impl ValueType for DynamicMatrix {
     }
   }
 
+  fn compile(&self) -> Result<CompiledValue> {
+    self.to_value().compile()
+  }
+
   fn data_type(&self) -> DataType {
     DataType::DynamicMatrix
+  }
+
+  fn is_dynamic(&self) -> bool {
+    true
   }
 
   #[cfg(feature = "egui")]

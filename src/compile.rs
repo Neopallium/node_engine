@@ -37,65 +37,56 @@ impl CompiledValue {
         return Err(anyhow!("Dynamic Matrix compiled values are not supported"));
       }
       // From I32
-      (DataType::I32, DataType::U32) => format!("i32({})", self.value),
-      (DataType::I32, DataType::F32) => format!("i32({})", self.value),
-      (DataType::I32, DataType::Vec2) => format!("i32({}.x)", self.value),
-      (DataType::I32, DataType::Vec3) => format!("i32({}.x)", self.value),
-      (DataType::I32, DataType::Vec4) => format!("i32({}.x)", self.value),
-      (DataType::I32, DataType::Mat2) => format!("i32({}[0])", self.value),
-      (DataType::I32, DataType::Mat3) => format!("i32({}[0])", self.value),
-      (DataType::I32, DataType::Mat4) => format!("i32({}[0])", self.value),
+      (DataType::I32, DataType::U32) => format!("u32({})", self.value),
+      (DataType::I32, DataType::F32) => format!("f32({})", self.value),
+      (DataType::I32, DataType::Vec2) => format!("vec2<f32>({}, 0.)", self.value),
+      (DataType::I32, DataType::Vec3) => format!("vec3<f32>({}, 0., 0.)", self.value),
+      (DataType::I32, DataType::Vec4) => format!("vec4<f32>({}, 0., 0., 1.)", self.value),
       (DataType::I32, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
       },
       // From U32
-      (DataType::U32, DataType::I32) => format!("u32({})", self.value),
-      (DataType::U32, DataType::F32) => format!("u32({})", self.value),
-      (DataType::U32, DataType::Vec2) => format!("u32({}.x)", self.value),
-      (DataType::U32, DataType::Vec3) => format!("u32({}.x)", self.value),
-      (DataType::U32, DataType::Vec4) => format!("u32({}.x)", self.value),
-      (DataType::U32, DataType::Mat2) => format!("u32({}[0])", self.value),
-      (DataType::U32, DataType::Mat3) => format!("u32({}[0])", self.value),
-      (DataType::U32, DataType::Mat4) => format!("u32({}[0])", self.value),
+      (DataType::U32, DataType::I32) => format!("i32({})", self.value),
+      (DataType::U32, DataType::F32) => format!("f32({})", self.value),
+      (DataType::U32, DataType::Vec2) => format!("vec2<f32>({}, 0.)", self.value),
+      (DataType::U32, DataType::Vec3) => format!("vec3<f32>({}, 0., 0.)", self.value),
+      (DataType::U32, DataType::Vec4) => format!("vec4<f32>({}, 0., 0., 1.)", self.value),
       (DataType::U32, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
       },
       // From F32
-      (DataType::F32, DataType::I32) => format!("f32({})", self.value),
-      (DataType::F32, DataType::U32) => format!("f32({})", self.value),
-      (DataType::F32, DataType::Vec2) => format!("f32({}.x)", self.value),
-      (DataType::F32, DataType::Vec3) => format!("f32({}.x)", self.value),
-      (DataType::F32, DataType::Vec4) => format!("f32({}.x)", self.value),
-      (DataType::F32, DataType::Mat2) => format!("f32({}[0])", self.value),
-      (DataType::F32, DataType::Mat3) => format!("f32({}[0])", self.value),
-      (DataType::F32, DataType::Mat4) => format!("f32({}[0])", self.value),
+      (DataType::F32, DataType::I32) => format!("i32({})", self.value),
+      (DataType::F32, DataType::U32) => format!("u32({})", self.value),
+      (DataType::F32, DataType::Vec2) => format!("vec2<f32>({}, 0.)", self.value),
+      (DataType::F32, DataType::Vec3) => format!("vec3<f32>({}, 0., 0.)", self.value),
+      (DataType::F32, DataType::Vec4) => format!("vec4<f32>({}, 0., 0., 1.)", self.value),
       (DataType::F32, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
       },
       // From Vec2
-      (DataType::Vec2, DataType::I32) =>  format!("vec2<f32>({}, 0.)", self.value),
-      (DataType::Vec2, DataType::U32) =>  format!("vec2<f32>({}, 0.)", self.value),
-      (DataType::Vec2, DataType::F32) =>  format!("vec2<f32>({}, 0.)", self.value),
-      (DataType::Vec2, DataType::Vec3) => format!("vec2<f32>({}.xy)", self.value),
-      (DataType::Vec2, DataType::Vec4) => format!("vec2<f32>({}.xy)", self.value),
+      (DataType::Vec2, DataType::I32) =>  format!("i32({}.x)", self.value),
+      (DataType::Vec2, DataType::U32) =>  format!("u32({}.x)", self.value),
+      (DataType::Vec2, DataType::F32) =>  format!("f32({}.x)", self.value),
+      (DataType::Vec2, DataType::Vec3) => format!("vec3<f32>({}.xy, 0.)", self.value),
+      (DataType::Vec2, DataType::Vec4) => format!("vec4<f32>({}.xy, 0., 1.)", self.value),
       (DataType::Vec2, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
       },
       // From Vec3
-      (DataType::Vec3, DataType::I32) =>  format!("vec3<f32>({}, 0., 0.)", self.value),
-      (DataType::Vec3, DataType::U32) =>  format!("vec3<f32>({}, 0., 0.)", self.value),
-      (DataType::Vec3, DataType::F32) =>  format!("vec3<f32>({}, 0., 0.)", self.value),
-      (DataType::Vec3, DataType::Vec2) => format!("vec3<f32>({}, 0.)", self.value),
-      (DataType::Vec3, DataType::Vec4) => format!("vec3<f32>({}.xyz)", self.value),
+      (DataType::Vec3, DataType::I32) =>  format!("i32({}.x)", self.value),
+      (DataType::Vec3, DataType::U32) =>  format!("u32({}.x)", self.value),
+      (DataType::Vec3, DataType::F32) =>  format!("f32({}.x)", self.value),
+      (DataType::Vec3, DataType::Vec2) => format!("vec2<f32>({}.xy)", self.value),
+      (DataType::Vec3, DataType::Vec4) => format!("vec4<f32>({}.xyz, 1.)", self.value),
       (DataType::Vec3, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
       },
       // From Vec4
-      (DataType::Vec4, DataType::I32) =>  format!("vec4<f32>({}, 0., 0., 1.)", self.value),
-      (DataType::Vec4, DataType::U32) =>  format!("vec4<f32>({}, 0., 0., 1.)", self.value),
-      (DataType::Vec4, DataType::F32) =>  format!("vec4<f32>({}, 0., 0., 1.)", self.value),
-      (DataType::Vec4, DataType::Vec2) => format!("vec4<f32>({}, 0., 1.)", self.value),
-      (DataType::Vec4, DataType::Vec3) => format!("vec4<f32>({}, 1.)", self.value),
+      (DataType::Vec4, DataType::I32) =>  format!("i32({}.x)", self.value),
+      (DataType::Vec4, DataType::U32) =>  format!("u32({}.x)", self.value),
+      (DataType::Vec4, DataType::F32) =>  format!("f32({}.x)", self.value),
+      (DataType::Vec4, DataType::Vec2) => format!("vec2<f32>({}.xy)", self.value),
+      (DataType::Vec4, DataType::Vec3) => format!("vec4<f32>({}.xyz)", self.value),
       (DataType::Vec4, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
       },
@@ -175,7 +166,7 @@ impl CodeBlock {
     let output = self.outputs.get(&id)
       .ok_or_else(|| anyhow!("Tried to resolve an unknown output: {id:?}"))?;
     // Generate the output if it hasn't already been generated.
-    match output.clone() {
+    let value = match output.clone() {
       NodeOutput::LazyCode(prefix, code, dt) => {
         let name = self.add_local(&prefix, code, dt);
         let value = CompiledValue {
@@ -186,7 +177,8 @@ impl CodeBlock {
         Ok(value)
       }
       NodeOutput::Compiled(value) => Ok(value),
-    }
+    };
+    value
   }
 
   pub fn append_output(&mut self, node: NodeId, code: String) {

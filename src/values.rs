@@ -19,7 +19,6 @@ pub mod vector;
 pub use vector::*;
 
 pub mod scalar;
-pub use scalar::*;
 
 pub mod matrix;
 pub use matrix::*;
@@ -108,6 +107,67 @@ impl Value {
     }
   }
 
+  pub fn compile(&self) -> Result<CompiledValue> {
+    let value = match self {
+      Value::I32(val) => {
+        format!("{val:?}")
+      }
+      Value::U32(val) => {
+        format!("{val:?}")
+      }
+      Value::F32(val) => {
+        format!("{val:?}")
+      }
+      Value::Vec2(v) => {
+        format!("vec2<f32>({:?}, {:?})", v.x, v.y)
+      }
+      Value::Vec3(v) => {
+        format!("vec3<f32>({:?}, {:?}, {:?})", v.x, v.y, v.z)
+      }
+      Value::Vec4(v) => {
+        format!("vec4<f32>({:?}, {:?}, {:?}, {:?})", v.x, v.y, v.z, v.w)
+      }
+      Value::Mat2(m) => {
+        let col0 = m.col(0).compile()?;
+        let col1 = m.col(1).compile()?;
+        format!("mat2x2({col0}, {col1})")
+      }
+      Value::Mat3(m) => {
+        let col0 = m.col(0).compile()?;
+        let col1 = m.col(1).compile()?;
+        let col2 = m.col(2).compile()?;
+        format!("mat3x3({col0}, {col1}, {col2})")
+      }
+      Value::Mat4(m) => {
+        let col0 = m.col(0).compile()?;
+        let col1 = m.col(1).compile()?;
+        let col2 = m.col(2).compile()?;
+        let col3 = m.col(3).compile()?;
+        format!("mat4x4({col0}, {col1}, {col2}, {col3})")
+      }
+      Value::Texture2D(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Texture2DArray(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Texture3D(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Cubemap(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+    };
+    Ok(CompiledValue {
+      value,
+      dt: self.data_type(),
+    })
+  }
+
   #[cfg(feature = "egui")]
   pub fn ui(&mut self, ui: &mut egui::Ui) -> bool {
     match self {
@@ -182,55 +242,6 @@ impl From<Mat4> for Value {
   }
 }
 
-pub fn decode_color(color: Option<&str>) -> Option<ecolor::Color32> {
-  use ecolor::Color32;
-  match color {
-    None => None,
-    Some("RED") => Some(Color32::RED),
-    Some("GREEN") => Some(Color32::GREEN),
-    Some("BLUE") => Some(Color32::BLUE),
-    Some("YELLOW") => Some(Color32::YELLOW),
-    Some("LIGHT_RED") => Some(Color32::LIGHT_RED),
-    Some("LIGHT_GREEN") => Some(Color32::LIGHT_GREEN),
-    Some("LIGHT_BLUE") => Some(Color32::LIGHT_BLUE),
-    Some("LIGHT_YELLOW") => Some(Color32::LIGHT_YELLOW),
-    Some("DARK_RED") => Some(Color32::DARK_RED),
-    Some("DARK_GREEN") => Some(Color32::DARK_GREEN),
-    Some("DARK_BLUE") => Some(Color32::DARK_BLUE),
-    Some("WHITE") => Some(Color32::WHITE),
-    Some("BLACK") => Some(Color32::BLACK),
-    Some(val) => {
-      let off = if val.starts_with("#") {
-        1
-      } else if val.starts_with("0x") {
-        2
-      } else {
-        0
-      };
-      match hex::decode(&val[off..]) {
-        Ok(val) if val.len() > 4 => {
-          log::error!("Failed to decode color, hex value too long: {val:?}");
-          None
-        }
-        Ok(val) => {
-          let r = *val.get(0).unwrap_or(&0);
-          let g = *val.get(1).unwrap_or(&0);
-          let b = *val.get(2).unwrap_or(&0);
-          if let Some(a) = val.get(3) {
-            Some(Color32::from_rgba_premultiplied(r, g, b, *a))
-          } else {
-            Some(Color32::from_rgb(r, g, b))
-          }
-        }
-        Err(err) => {
-          log::error!("Failed to decode color: {val:?}: {err:?}");
-          None
-        }
-      }
-    }
-  }
-}
-
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InputDefinition {
   pub name: String,
@@ -258,8 +269,8 @@ impl InputDefinition {
     )
   }
 
-  pub fn set_color(&mut self, color: Option<&str>) {
-    self.color = decode_color(color);
+  pub fn set_color(&mut self, color: Option<u32>) {
+    self.color = color.map(u32_to_color);
   }
 
   pub fn default_value(&self) -> Value {
@@ -312,8 +323,8 @@ impl OutputDefinition {
     )
   }
 
-  pub fn set_color(&mut self, color: Option<&str>) {
-    self.color = decode_color(color);
+  pub fn set_color(&mut self, color: Option<u32>) {
+    self.color = color.map(u32_to_color);
   }
 
   pub fn default_value(&self) -> Value {
@@ -517,13 +528,13 @@ impl ParameterDefinition {
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct OutputTyped<T> {
+pub struct OutputTyped<T, const N: u32, const C: u32 = 0> {
   _phantom: core::marker::PhantomData<T>,
   /// Used for Dynamic outputs.
   concrete_type: Option<DataType>,
 }
 
-impl<T: ValueType + Default> OutputTyped<T> {
+impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
   pub fn data_type(&self) -> DataType {
     self.concrete_type.unwrap_or_else(|| T::default().data_type())
   }
@@ -557,10 +568,14 @@ impl<T: ValueType + Default> OutputTyped<T> {
       false
     }
   }
+
+  pub fn compile(&self, compile: &mut NodeGraphCompile, node: NodeId, prefix: &str, code: String, dt: DataType) -> Result<()> {
+    compile.add_output(OutputId::new(node, N), prefix, code, dt)
+  }
 }
 
 #[cfg(feature = "egui")]
-impl<T: ValueType + Default> OutputTyped<T> {
+impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
   #[cfg(feature = "egui")]
   pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, idx: usize, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
     ui.horizontal(|ui| {
@@ -574,5 +589,22 @@ impl<T: ValueType + Default> OutputTyped<T> {
         ui.label(&def.name);
       });
     });
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[derive(Clone, Debug, Default)]
+  pub struct TestOutput {
+    pub out0: OutputTyped<f32, { 0 + 0 }, 0>,
+    pub out1: OutputTyped<f32, { 0 + 1 }, 0>,
+  }
+
+  #[test]
+  fn test_typed_outputs() {
+    let test = TestOutput::default();
+    eprintln!("{test:?}");
   }
 }

@@ -60,12 +60,12 @@ impl From<NodeId> for Input {
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct InputTyped<T> {
+pub struct InputTyped<T, const N: u32> {
   value: T,
   connected: Option<(OutputId, Option<DataType>)>,
 }
 
-impl<T: ValueType> InputTyped<T> {
+impl<T: ValueType, const N: u32> InputTyped<T, N> {
   pub fn new(value: T) -> Self {
     Self {
       value,
@@ -161,7 +161,7 @@ impl<T: ValueType> InputTyped<T> {
   }
 }
 
-impl<T: ValueType + Clone + Default> InputTyped<T> {
+impl<T: ValueType + Clone + Default, const N: u32> InputTyped<T, N> {
   pub fn eval(&self, graph: &NodeGraph, execution: &mut NodeGraphExecution) -> Result<T> {
     match &self.connected {
       Some((OutputId { node: id, .. }, _)) => {

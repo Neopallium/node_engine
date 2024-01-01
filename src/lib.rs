@@ -14,6 +14,9 @@ pub mod graph;
 pub use graph::*;
 pub mod macros;
 
+pub mod color;
+pub use color::*;
+
 pub mod eval;
 pub use eval::*;
 pub mod compile;

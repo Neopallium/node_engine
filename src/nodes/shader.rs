@@ -20,7 +20,7 @@ impl_node! {
       /// Texture.
       pub tex: Input<Texture2DHandle>,
       /// RGBA value.
-      pub rgba: Output<Vec4> Color("WHITE"),
+      pub rgba: Output<Vec4> Color(0xFFFFFF),
     }
 
     impl TextureNode {
@@ -30,11 +30,11 @@ impl_node! {
     }
 
     impl NodeImpl for TextureNode {
-      fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
-        let block = compile.current_block()?;
+      fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
+        let (uv, _tex) = self.resolve_inputs(graph, compile)?;
         // TODO: add context lookups.
-        block.append_output(id, "in.uv".to_string());
-        Ok(())
+        let code = format!("textureSample(texture, texture_sampler, {uv})");
+        compile.add_output(id.into(), "texture_node", code, DataType::Vec4)
       }
     }
   }
@@ -65,10 +65,8 @@ impl_node! {
 
     impl NodeImpl for UVNode {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
-        let block = compile.current_block()?;
         // TODO: add context lookups.
-        block.append_output(id, "in.uv".to_string());
-        Ok(())
+        compile.add_output(id.into(), "uv_node", format!("in.uv"), DataType::Vec2)
       }
     }
   }
@@ -127,7 +125,7 @@ fn fragment(
               .to_string(),
           );
         }
-        let color = self.color.compile(graph, compile)?;
+        let color = self.resolve_inputs(graph, compile)?;
         let block = compile.current_block()?;
         block.append(format!(
           r#"

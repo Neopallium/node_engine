@@ -72,6 +72,7 @@ macro_rules! impl_node {
         []
         []
         []
+        [0] [0] [0]
         []
         {}
         {}
@@ -88,6 +89,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -106,6 +108,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [ $( $node_struct_fields )* ]
         { $( $node_struct )* }
         { $( $node_impl )* }
@@ -122,6 +125,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -150,6 +154,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [ $( $node_struct_fields )* ]
         { $( $node_struct )* }
         { $( $node_impl )* }
@@ -166,6 +171,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       []
       {}
       { $( $node_impl:tt )* }
@@ -185,6 +191,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         []
         {
           $(#[$node_struct_attr])*
@@ -207,13 +214,14 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
       { $( $node_trait_impl:tt )* }
       ___internal_parse_fields {
           $( #[$field_meta:meta] )*
-          $field_vis:vis $field_name:ident : Input<$field_ty:ident> $(Color($color:literal))?,
+          $field_vis:vis $field_name:ident : Input<$field_ty:ident> $(Color($color:tt))?,
           $($unparsed_fields:tt)*
       }
       $($rest:tt)*
@@ -226,14 +234,15 @@ macro_rules! impl_node {
         { $( $extra_code )* }
         [
           $( $node_inputs )*
-          $field_name : $field_ty $(Color($color))?,
+          $field_name : $field_ty Idx($( $count_inputs )*) $(Color($color))?,
         ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* + 1 ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [
           $( $node_struct_fields )*
           $( #[$field_meta] )*
-          $field_vis $field_name : InputTyped<$field_ty>,
+          $field_vis $field_name : InputTyped<$field_ty, { $( $count_inputs )* }>,
         ]
         { $( $node_struct )* }
         { $( $node_impl )* }
@@ -253,6 +262,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -276,6 +286,7 @@ macro_rules! impl_node {
           $field_name : $field_ty,
         ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [
           $( $node_struct_fields )*
           $( #[$field_meta] )*
@@ -299,13 +310,14 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
       { $( $node_trait_impl:tt )* }
       ___internal_parse_fields {
           $( #[$field_meta:meta] )*
-          $field_vis:vis $field_name:ident : Output<$field_ty:ident> $(Color($color:literal))?,
+          $field_vis:vis $field_name:ident : Output<$field_ty:ident> $(Color($color:tt))?,
           $($unparsed_fields:tt)*
       }
       $($rest:tt)*
@@ -320,13 +332,14 @@ macro_rules! impl_node {
         [ $( $node_parameters )* ]
         [
           $( $node_outputs )*
-          $field_name : $field_ty $(Color($color))?,
+          $field_name : $field_ty Idx($( $count_outputs )*) $(Color($color))?,
         ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* + 1 ]
         [
           $( $node_struct_fields )*
           $( #[$field_meta] )*
           #[serde(skip)]
-          $field_vis $field_name : OutputTyped<$field_ty>,
+          $field_vis $field_name : OutputTyped<$field_ty, { $( $count_outputs )* }$(, { $color })?>,
         ]
         { $( $node_struct )* }
         { $( $node_impl )* }
@@ -346,6 +359,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -366,6 +380,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [
           $( $node_struct_fields )*
           $( #[$field_meta] )*
@@ -389,6 +404,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -405,6 +421,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [ $( $node_struct_fields )* ]
         { $( $node_struct )* }
         { $( $node_impl )* }
@@ -421,6 +438,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -440,6 +458,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [ $( $node_struct_fields )* ]
         { $( $node_struct )* }
         {
@@ -463,6 +482,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -482,6 +502,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [ $( $node_struct_fields )* ]
         { $( $node_struct )* }
         { $( $node_impl )* }
@@ -503,6 +524,7 @@ macro_rules! impl_node {
       [ $( $node_inputs:tt )* ]
       [ $( $node_parameters:tt )* ]
       [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       { $( $node_struct:tt )* }
       { $( $node_impl:tt )* }
@@ -522,6 +544,7 @@ macro_rules! impl_node {
         [ $( $node_inputs )* ]
         [ $( $node_parameters )* ]
         [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         [ $( $node_struct_fields )* ]
         { $( $node_struct )* }
         {
@@ -560,9 +583,10 @@ macro_rules! impl_node {
         $(,)?
       }
       { $( $extra_code:tt )* }
-      [ $( $field_input_name:ident: $field_input_ty:ident $(Color($field_input_color:literal))?,)* ]
+      [ $( $field_input_name:ident: $field_input_ty:ident Idx($field_input_idx:expr) $(Color($field_input_color:tt))?,)* ]
       [ $( $field_param_name:ident: $field_param_ty:ident, )* ]
-      [ $( $field_output_name:ident: $field_output_ty:ident $(Color($field_output_color:literal))?, )* ]
+      [ $( $field_output_name:ident: $field_output_ty:ident Idx($field_output_idx:expr) $(Color($field_output_color:tt))?, )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       {
         $(#[$node_struct_attr:meta])*
@@ -618,18 +642,14 @@ macro_rules! impl_node {
           $(
             $(
               {
-                use $crate::heck::ToTitleCase;
-                let name = stringify!($field_input_name).to_title_case();
-                def.set_input_color(&name, Some($field_input_color));
+                def.set_input_color($field_input_idx, Some($field_input_color));
               }
             )?
           )*
           $(
             $(
               {
-                use $crate::heck::ToTitleCase;
-                let name = stringify!($field_output_name).to_title_case();
-                def.set_output_color(&name, Some($field_output_color));
+                def.set_output_color($field_output_idx, Some($field_output_color));
               }
             )?
           )*
@@ -667,31 +687,35 @@ macro_rules! impl_node {
           &DEFINITION
         }
 
-        fn get_node_input(&self, idx: &InputKey) -> Result<Input> {
-          match self.def().get_input(idx) {
-            Some(input) => match input.field_name.as_str() {
-              $(
-                stringify!($field_input_name) => {
-                  Ok(self.$field_input_name.as_input())
-                }
-              )*
-              field_name => Err(anyhow::anyhow!("Unknown input field: {field_name}")),
-            }
-            _ => Err(anyhow::anyhow!("Unknown input: {idx:?}")),
+        fn get_node_input(&self, key: &InputKey) -> Result<Input> {
+          $(
+            #[allow(non_upper_case_globals)]
+            const $field_input_name: u32 = $field_input_idx;
+          )*
+          #[allow(non_upper_case_globals)]
+          match self.get_input_idx(key)? {
+            $(
+              $field_input_name => {
+                Ok(self.$field_input_name.as_input())
+              }
+            )*
+            _ => Err(anyhow::anyhow!("Invalid input key: {key:?}")),
           }
         }
 
-        fn set_node_input(&mut self, idx: &InputKey, _value: Input) -> Result<Option<OutputId>> {
-          match self.def().get_input(idx) {
-            Some(input) => match input.field_name.as_str() {
-              $(
-                stringify!($field_input_name) => {
-                  self.$field_input_name.set_input(_value)
-                }
-              )*
-              field_name => Err(anyhow::anyhow!("Unknown input field: {field_name}")),
-            }
-            _ => Err(anyhow::anyhow!("Unknown input: {idx:?}")),
+        fn set_node_input(&mut self, key: &InputKey, _value: Input) -> Result<Option<OutputId>> {
+          $(
+            #[allow(non_upper_case_globals)]
+            const $field_input_name: u32 = $field_input_idx;
+          )*
+          #[allow(non_upper_case_globals)]
+          match self.get_input_idx(key)? {
+            $(
+              $field_input_name => {
+                self.$field_input_name.set_input(_value)
+              }
+            )*
+            _ => Err(anyhow::anyhow!("Invalid input key: {key:?}")),
           }
         }
 

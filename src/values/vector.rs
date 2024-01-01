@@ -314,8 +314,16 @@ impl ValueType for DynamicVector {
     }
   }
 
+  fn compile(&self) -> Result<CompiledValue> {
+    self.to_value().compile()
+  }
+
   fn data_type(&self) -> DataType {
     DataType::DynamicVector
+  }
+
+  fn is_dynamic(&self) -> bool {
+    true
   }
 
   #[cfg(feature = "egui")]
@@ -325,17 +333,8 @@ impl ValueType for DynamicVector {
   }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum Dynamic {
-  Vector(DynamicVector),
-  Matrix(DynamicMatrix),
-}
-
-impl Default for Dynamic {
-  fn default() -> Self {
-    Self::Vector(Default::default())
-  }
-}
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct Dynamic(DynamicVector);
 
 impl ValueType for Dynamic {
   fn clone_value(&self) -> Box<dyn ValueType> {
@@ -343,46 +342,27 @@ impl ValueType for Dynamic {
   }
 
   fn to_value(&self) -> Value {
-    match self {
-      Self::Vector(v) => v.to_value(),
-      Self::Matrix(m) => m.to_value(),
-    }
+    self.0.to_value()
   }
 
   fn set_value(&mut self, value: Value) -> Result<()> {
-    match &value {
-      Value::I32(_)
-      | Value::U32(_)
-      | Value::F32(_)
-      | Value::Vec2(_)
-      | Value::Vec3(_)
-      | Value::Vec4(_) => {
-        let mut v = DynamicVector::default();
-        v.set_value(value)?;
-        *self = Self::Vector(v);
-        Ok(())
-      }
-      Value::Mat2(_) | Value::Mat3(_) | Value::Mat4(_) => {
-        let mut m = DynamicMatrix::default();
-        m.set_value(value)?;
-        *self = Self::Matrix(m);
-        Ok(())
-      }
-      _ => Err(anyhow!(
-        "Expected a Dynamic Vector or Matrix got: {value:?}"
-      )),
-    }
+    self.0.set_value(value)
+  }
+
+  fn compile(&self) -> Result<CompiledValue> {
+    self.to_value().compile()
   }
 
   fn data_type(&self) -> DataType {
     DataType::Dynamic
   }
 
+  fn is_dynamic(&self) -> bool {
+    true
+  }
+
   #[cfg(feature = "egui")]
   fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    match self {
-      Self::Vector(v) => v.ui(ui),
-      Self::Matrix(m) => m.ui(ui),
-    }
+    self.0.ui(ui)
   }
 }
