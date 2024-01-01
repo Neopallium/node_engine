@@ -1,4 +1,9 @@
 #[macro_export]
+macro_rules! replace_expr {
+  ($_t:tt $($sub:tt)*) => {$($sub)*};
+}
+
+#[macro_export]
 macro_rules! impl_enum_parameter_type {
   // Parse Parameter enum types.
   ($(#[$param_enum_meta:meta])*
@@ -647,6 +652,11 @@ macro_rules! impl_node {
 
       $( $node_impl )*
 
+      $crate::impl_node! {
+        @impl_resolve_inputs
+        $node_ty_name [ $( $field_input_name ),* ]
+      }
+
       $(#[$node_impl_meta])*
       impl NodeImpl for $node_ty_name {
         fn clone_node(&self) -> Box<dyn $crate::NodeImpl> {
@@ -714,12 +724,12 @@ macro_rules! impl_node {
         }
 
         #[cfg(feature = "egui")]
-        fn inputs_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) -> bool {
+        fn inputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
           let mut _defs = DEFINITION.inputs.values().enumerate();
           let mut _updated = false;
           $(
             if let Some((idx, def)) = _defs.next() {
-              if self.$field_input_name.ui(idx, def, _ui, _id) {
+              if self.$field_input_name.ui(_concrete_type, idx, def, _ui, _id) {
                 _updated = true;
               }
             }
@@ -728,18 +738,18 @@ macro_rules! impl_node {
         }
 
         #[cfg(feature = "egui")]
-        fn outputs_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) -> bool {
+        fn outputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
           let mut _defs = DEFINITION.outputs.values().enumerate();
           $(
             if let Some((idx, def)) = _defs.next() {
-              self.$field_output_name.ui(idx, def, _ui, _id);
+              self.$field_output_name.ui(_concrete_type, idx, def, _ui, _id);
             }
           )*
           false
         }
 
         #[cfg(feature = "egui")]
-        fn parameters_ui(&mut self, _ui: &mut egui::Ui, _id: NodeId) -> bool {
+        fn parameters_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
           let mut _defs = DEFINITION.parameters.values();
           let mut _updated = false;
           $(
@@ -758,6 +768,53 @@ macro_rules! impl_node {
       $($rest)*
     }
     pub use $mod_name::$node_ty_name;
+  };
+  // Implement compile inputs helper.  No inputs.
+  (@impl_resolve_inputs
+    $node_ty_name:ident []
+  ) => {
+  };
+  // Implement compile inputs helper.  Only one input.
+  (@impl_resolve_inputs
+    $node_ty_name:ident [ $field_input_name:ident ]
+  ) => {
+    impl $node_ty_name {
+      pub fn resolve_inputs(&self, graph: &$crate::NodeGraph, compile: &mut $crate::NodeGraphCompile)
+        -> Result<$crate::CompiledValue>
+      {
+        self.$field_input_name.compile(graph, compile)
+      }
+    }
+  };
+  // Implement compile inputs helper.
+  (@impl_resolve_inputs
+    $node_ty_name:ident [ $( $field_input_name:ident),* ]
+  ) => {
+    impl $node_ty_name {
+      pub fn resolve_inputs(&self, graph: &$crate::NodeGraph, compile: &mut $crate::NodeGraphCompile)
+        -> Result<($(
+            $crate::replace_expr!(
+              $field_input_name
+              $crate::CompiledValue
+            )
+      ),*)>
+      {
+        let mut concrete_type = $crate::NodeConcreteType::default();
+        $(
+          let mut $field_input_name = self.$field_input_name.resolve(&mut concrete_type, graph, compile)?;
+        )*
+        if concrete_type.has_dynamic() {
+          $(
+            if self.$field_input_name.is_dynamic() {
+              concrete_type.convert(&mut $field_input_name)?;
+            }
+          )*
+        }
+        Ok(($(
+          $field_input_name
+        ),*))
+      }
+    }
   }
 }
 
@@ -816,7 +873,8 @@ mod test {
       }
 
       impl NodeImpl for TestNode {
-        fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
+        fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
+          let (_color, _scale) = self.resolve_inputs(graph, compile)?;
           let block = compile.current_block()?;
           // TODO: add context lookups.
           block.append_output(id, "in.uv".to_string());

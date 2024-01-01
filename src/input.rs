@@ -62,7 +62,7 @@ impl From<NodeId> for Input {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct InputTyped<T> {
   value: T,
-  connected: Option<OutputId>,
+  connected: Option<(OutputId, Option<DataType>)>,
 }
 
 impl<T: ValueType> InputTyped<T> {
@@ -77,22 +77,46 @@ impl<T: ValueType> InputTyped<T> {
     self.connected.is_some()
   }
 
+  pub fn is_dynamic(&self) -> bool {
+    self.value.is_dynamic()
+  }
+
   pub fn as_input(&self) -> Input {
     match &self.connected {
-      Some(id) => Input::Connect(*id, Some(self.value.data_type())),
+      Some((id, dt)) => Input::Connect(*id, *dt),
       None => Input::Value(self.value.to_value()),
     }
   }
 
-  pub fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile) -> Result<String> {
-    match &self.connected {
-      Some(OutputId { node: id, .. }) => compile.resolve_node(graph, *id),
-      None => compile.compile_value(&self.value.to_value()),
-    }
+  pub fn resolve(&self, concrete_type: &mut NodeConcreteType, graph: &NodeGraph, compile: &mut NodeGraphCompile) -> Result<CompiledValue> {
+    let mut value = match &self.connected {
+      Some((id, _)) => {
+        let value = compile.resolve_output(graph, *id)?;
+        if self.is_dynamic() {
+          // Collect info about dynamic inputs.
+          concrete_type.add_input_type(value.dt);
+        }
+        value
+      }
+      None => self.value.compile()?,
+    };
+    // Make sure the value is in our type.
+    value.convert(self.value.data_type())?;
+    Ok(value)
+  }
+
+  pub fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile) -> Result<CompiledValue> {
+    let mut value = match &self.connected {
+      Some((id, _)) => compile.resolve_output(graph, *id)?,
+      None => self.value.compile()?,
+    };
+    // Make sure the value is in our type.
+    value.convert(self.value.data_type())?;
+    Ok(value)
   }
 
   pub fn set_input(&mut self, input: Input) -> Result<Option<OutputId>> {
-    let old = self.connected.take();
+    let old = self.connected.take().map(|(id, _)| id);
     match input {
       Input::Disconnect => (),
       Input::Value(val) => {
@@ -104,24 +128,33 @@ impl<T: ValueType> InputTyped<T> {
             return Err(anyhow!("Incompatible output"));
           }
         }
-        self.connected = Some(id);
+        self.connected = Some((id, dt));
       }
     }
     Ok(old)
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, idx: usize, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) -> bool {
+  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, idx: usize, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
-      let connected = self.is_connected();
-      ui.add(NodeSocket::input(id, idx, connected, def));
-      if connected {
-        ui.label(&def.name);
-      } else {
-        ui.collapsing(&def.name, |ui| {
-          changed = self.value.ui(ui);
-        });
+      match self.connected {
+        Some((output_id, _)) => {
+          if self.is_dynamic() {
+            let dt = NodeGraphMeta::get(ui).and_then(|g| g.resolve_output(&output_id));
+            if let Some(dt) = dt {
+              concrete_type.add_input_type(dt);
+            }
+          }
+          ui.add(NodeSocket::input(id, idx, true, def));
+          ui.label(&def.name);
+        },
+        None => {
+          ui.add(NodeSocket::input(id, idx, false, def));
+          ui.collapsing(&def.name, |ui| {
+            changed = self.value.ui(ui);
+          });
+        },
       }
     });
     changed
@@ -131,7 +164,7 @@ impl<T: ValueType> InputTyped<T> {
 impl<T: ValueType + Clone + Default> InputTyped<T> {
   pub fn eval(&self, graph: &NodeGraph, execution: &mut NodeGraphExecution) -> Result<T> {
     match &self.connected {
-      Some(OutputId { node: id, .. }) => {
+      Some((OutputId { node: id, .. }, _)) => {
         let mut val = T::default();
         val.set_value(execution.eval_node(graph, *id)?)?;
         Ok(val)

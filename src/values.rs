@@ -519,15 +519,58 @@ impl ParameterDefinition {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct OutputTyped<T> {
   _phantom: core::marker::PhantomData<T>,
+  /// Used for Dynamic outputs.
+  concrete_type: Option<DataType>,
+}
+
+impl<T: ValueType + Default> OutputTyped<T> {
+  pub fn data_type(&self) -> DataType {
+    self.concrete_type.unwrap_or_else(|| T::default().data_type())
+  }
+
+  pub fn is_dynamic(&self) -> bool {
+    T::default().data_type().is_dynamic()
+  }
+
+  pub fn update_concrete_type(&mut self, concrete_type: &NodeConcreteType) -> bool {
+    let dt = T::default().data_type();
+    let new_type = match dt {
+      DataType::Dynamic => concrete_type.data_type(),
+      DataType::DynamicVector => match concrete_type.min {
+        Some(DynamicSize::D2) => Some(DataType::Vec2),
+        Some(DynamicSize::D3) => Some(DataType::Vec3),
+        Some(DynamicSize::D4) => Some(DataType::Vec4),
+        _ => Some(DataType::F32),
+      },
+      DataType::DynamicMatrix => match concrete_type.min {
+        Some(DynamicSize::D2) => Some(DataType::Mat2),
+        Some(DynamicSize::D3) => Some(DataType::Mat3),
+        Some(DynamicSize::D4) => Some(DataType::Mat4),
+        _ => None,
+      },
+      _ => None,
+    };
+    if new_type != self.concrete_type {
+      self.concrete_type = new_type;
+      true
+    } else {
+      false
+    }
+  }
 }
 
 #[cfg(feature = "egui")]
 impl<T: ValueType + Default> OutputTyped<T> {
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, idx: usize, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
+  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, idx: usize, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
     ui.horizontal(|ui| {
       ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        ui.add(NodeSocket::output(id, idx, def));
+        if self.is_dynamic() && self.update_concrete_type(concrete_type) {
+          if let Some(graph) = NodeGraphMeta::get(ui) {
+            graph.update_output(OutputId::new(id, idx as _));
+          }
+        }
+        ui.add(NodeSocket::output(id, idx, def, self.concrete_type));
         ui.label(&def.name);
       });
     });

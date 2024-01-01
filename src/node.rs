@@ -14,6 +14,112 @@ pub type NodeId = Uuid;
 
 pub const NAMESPACE_NODE_IMPL: Uuid = uuid::uuid!("9dee91a8-5af8-11ee-948b-5364d73b1803");
 
+/// This is used to resolve Dynamic Vector/Matrix inputs/outputs.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct NodeConcreteType {
+  /// The minimum size of connected Vector/Matrix.  Scalars are not counted.
+  pub min: Option<DynamicSize>,
+  pub scalars: usize,
+  pub vectors: usize,
+  pub matrixes: usize,
+}
+
+impl NodeConcreteType {
+  pub fn has_dynamic(&self) -> bool {
+    let count = self.scalars + self.vectors + self.matrixes;
+    count > 0
+  }
+
+  pub fn data_type(&self) -> Option<DataType> {
+    let count = self.scalars + self.vectors + self.matrixes;
+    if count > 0 {
+      match (self.min, self.scalars, self.vectors, self.matrixes) {
+        (None | Some(DynamicSize::D1), s, 0, 0) if s > 0 => Some(DataType::F32),
+        (Some(DynamicSize::D2), _, 0, m) if m > 0 => Some(DataType::Mat2),
+        (Some(DynamicSize::D3), _, 0, m) if m > 0 => Some(DataType::Mat3),
+        (Some(DynamicSize::D4), _, 0, m) if m > 0 => Some(DataType::Mat4),
+        (Some(DynamicSize::D2), _, v, _) if v > 0 => Some(DataType::Vec2),
+        (Some(DynamicSize::D3), _, v, _) if v > 0 => Some(DataType::Vec3),
+        (Some(DynamicSize::D4), _, v, _) if v > 0 => Some(DataType::Vec4),
+        _ => None,
+      }
+    } else {
+      None
+    }
+  }
+
+  pub fn convert(&self, value: &mut CompiledValue) -> Result<()> {
+    if let Some(min) = self.min {
+      let (vec_dt, mat_dt) = match min {
+        DynamicSize::D3 => (DataType::Vec3, DataType::Mat3),
+        DynamicSize::D4 => (DataType::Vec4, DataType::Mat4),
+        _ => (DataType::Vec2, DataType::Mat2),
+      };
+      match value.dt.class() {
+        DataTypeClass::Scalar => {
+          value.convert(vec_dt)
+        }
+        DataTypeClass::Vector => {
+          value.convert(vec_dt)
+        },
+        DataTypeClass::Matrix => {
+          value.convert(mat_dt)
+        },
+        class => {
+          Err(anyhow!("Unsupported data type conversion: class={class:?}, dt={:?}", value.dt))
+        }
+      }
+    } else {
+      Ok(())
+    }
+  }
+
+  pub fn add_input_type(&mut self, dt: DataType) {
+    let min = self.min.unwrap_or(DynamicSize::D4).len();
+    match dt {
+      DataType::I32 | DataType::U32 | DataType::F32 => {
+        self.scalars += 1;
+        // Don't update the `min` for Scalars.
+      }
+      DataType::Vec2 => {
+        self.vectors += 1;
+        // D2 is the smallest.
+        self.min = Some(DynamicSize::D2);
+      }
+      DataType::Vec3 => {
+        self.vectors += 1;
+        if min > 3 {
+          self.min = Some(DynamicSize::D3);
+        }
+      }
+      DataType::Vec4 => {
+        self.vectors += 1;
+        if min > 4 {
+          self.min = Some(DynamicSize::D4);
+        }
+      }
+      DataType::Mat2 => {
+        self.matrixes += 1;
+        // D2 is the smallest.
+        self.min = Some(DynamicSize::D2);
+      }
+      DataType::Mat3 => {
+        self.matrixes += 1;
+        if min > 3 {
+          self.min = Some(DynamicSize::D3);
+        }
+      }
+      DataType::Mat4 => {
+        self.matrixes += 1;
+        if min > 4 {
+          self.min = Some(DynamicSize::D4);
+        }
+      }
+      _ => ()
+    }
+  }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InputId {
   pub node: NodeId,
@@ -47,6 +153,15 @@ impl OutputId {
 
   pub fn node(&self) -> NodeId {
     self.node
+  }
+}
+
+impl From<NodeId> for OutputId {
+  fn from(node: NodeId) -> Self {
+    Self {
+      node,
+      idx: 0,
+    }
   }
 }
 
@@ -108,12 +223,13 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize + Send + Sync {
     let param_count = def.parameters.len();
     let node_style = NodeStyle::get(ui);
     let zoom = node_style.zoom;
+    let mut concrete_type = NodeConcreteType::default();
     let mut updated = false;
     ui.vertical(|ui| {
       ui.horizontal(|ui| {
         if input_count > 0 {
           ui.vertical(|ui| {
-            if self.inputs_ui(ui, id) {
+            if self.inputs_ui(&mut concrete_type, ui, id) {
               updated = true;
             }
           });
@@ -124,7 +240,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize + Send + Sync {
           }
           ui.vertical(|ui| {
             ui.set_min_width(50.0 * zoom);
-            if self.outputs_ui(ui, id) {
+            if self.outputs_ui(&mut concrete_type, ui, id) {
               updated = true;
             }
           });
@@ -132,7 +248,7 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize + Send + Sync {
       });
       if param_count > 0 {
         ui.separator();
-        if self.parameters_ui(ui, id) {
+        if self.parameters_ui(&mut concrete_type, ui, id) {
           updated = true;
         }
       }
@@ -141,13 +257,13 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize + Send + Sync {
   }
 
   #[cfg(feature = "egui")]
-  fn inputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool;
+  fn inputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId) -> bool;
 
   #[cfg(feature = "egui")]
-  fn parameters_ui(&mut self, ui: &mut egui::Ui, _id: NodeId) -> bool;
+  fn parameters_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, _id: NodeId) -> bool;
 
   #[cfg(feature = "egui")]
-  fn outputs_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool;
+  fn outputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId) -> bool;
 }
 
 impl Serialize for dyn NodeImpl {

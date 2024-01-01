@@ -236,7 +236,7 @@ pub enum DynamicSize {
 }
 
 impl DynamicSize {
-  pub fn len(&self) -> usize {
+  pub const fn len(&self) -> usize {
     match self {
       Self::D1 => 1,
       Self::D2 => 2,

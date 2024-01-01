@@ -525,6 +525,19 @@ impl NodeGraph {
         }
         updated |= node.updated;
       }
+
+      // Check for outputs that have changed their data types.
+      let outputs = state.take_updated_outputs();
+      if outputs.len() > 0 {
+        // Update any node that is connected to the changed outputs.
+        for (input, output) in self.connections.0.iter() {
+          if outputs.contains(output) {
+            if let Some(node) = self.nodes.0.get_mut(&input.node()) {
+              node.updated = true;
+            }
+          }
+        }
+      }
       // Check if any of the nodes have been updated.
       if updated {
         self.updated();

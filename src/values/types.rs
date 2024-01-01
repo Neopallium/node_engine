@@ -111,37 +111,133 @@ impl DataType {
 
   /// Check if the data type is compatible.
   pub fn is_compatible(&self, other: &DataType) -> bool {
+    // Same data type, no conversion.
     if self == other {
-      // Same data types are compatible.
-      true
-    } else {
-      match (self.class(), other.class()) {
-        (class, other) if class == other => match class {
-          // Matrix types must have the same size.
-          DataTypeClass::Matrix => false,
-          _ => true,
-        },
-        (DataTypeClass::Dynamic, other) | (other, DataTypeClass::Dynamic) => match other {
-          DataTypeClass::Scalar => true,
-          DataTypeClass::Vector => true,
-          DataTypeClass::Matrix => true,
-          DataTypeClass::Dynamic => true,
-          _ => false,
-        },
-        (DataTypeClass::Vector, other) | (other, DataTypeClass::Vector) => match other {
-          DataTypeClass::Scalar => true,
-          DataTypeClass::Vector => true,
-          DataTypeClass::Dynamic => true,
-          _ => false,
-        },
-        (DataTypeClass::Matrix, other) | (other, DataTypeClass::Matrix) => match other {
-          DataTypeClass::Dynamic => true,
-          // Matrix types must have the same size.
-          DataTypeClass::Matrix => false,
-          _ => false,
-        },
+      return true;
+    }
+    match self {
+      Self::I32 => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
         _ => false,
       }
+      Self::U32 => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
+        _ => false,
+      }
+      Self::F32 => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
+        _ => false,
+      }
+      Self::Vec2 => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
+        _ => false,
+      }
+      Self::Vec3 => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
+        _ => false,
+      }
+      Self::Vec4 => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
+        _ => false,
+      }
+      Self::Mat2 => match other {
+        Self::Mat2 => true,
+        Self::Dynamic => true,
+        Self::DynamicMatrix => true,
+        _ => false,
+      }
+      Self::Mat3 => match other {
+        Self::Mat2 => true,
+        Self::Mat3 => true,
+        Self::Dynamic => true,
+        Self::DynamicMatrix => true,
+        _ => false,
+      }
+      Self::Mat4 => match other {
+        Self::Mat2 => true,
+        Self::Mat3 => true,
+        Self::Mat4 => true,
+        Self::Dynamic => true,
+        Self::DynamicMatrix => true,
+        _ => false,
+      }
+      Self::Dynamic => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Mat2 => true,
+        Self::Mat3 => true,
+        Self::Mat4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
+        Self::DynamicMatrix => true,
+        _ => false,
+      }
+      Self::DynamicVector => match other {
+        Self::I32 => true,
+        Self::U32 => true,
+        Self::F32 => true,
+        Self::Vec2 => true,
+        Self::Vec3 => true,
+        Self::Vec4 => true,
+        Self::Dynamic => true,
+        Self::DynamicVector => true,
+        _ => false,
+      }
+      Self::DynamicMatrix => match other {
+        Self::Mat2 => true,
+        Self::Mat3 => true,
+        Self::Mat4 => true,
+        Self::Dynamic => true,
+        Self::DynamicMatrix => true,
+        _ => false,
+      }
+      _ => false,
     }
   }
 }
@@ -154,6 +250,67 @@ pub trait ValueType: core::fmt::Debug {
   fn to_value(&self) -> Value;
 
   fn data_type(&self) -> DataType;
+
+  fn compile(&self) -> Result<CompiledValue> {
+    let value = match self.to_value() {
+      Value::I32(val) => {
+        format!("{val:?}")
+      }
+      Value::U32(val) => {
+        format!("{val:?}")
+      }
+      Value::F32(val) => {
+        format!("{val:?}")
+      }
+      Value::Vec2(v) => {
+        format!("vec2<f32>({:?}, {:?})", v.x, v.y)
+      }
+      Value::Vec3(v) => {
+        format!("vec3<f32>({:?}, {:?}, {:?})", v.x, v.y, v.z)
+      }
+      Value::Vec4(v) => {
+        format!("vec4<f32>({:?}, {:?}, {:?}, {:?})", v.x, v.y, v.z, v.w)
+      }
+      Value::Mat2(m) => {
+        let col0 = m.col(0).compile()?;
+        let col1 = m.col(1).compile()?;
+        format!("mat2x2({col0}, {col1})")
+      }
+      Value::Mat3(m) => {
+        let col0 = m.col(0).compile()?;
+        let col1 = m.col(1).compile()?;
+        let col2 = m.col(2).compile()?;
+        format!("mat3x3({col0}, {col1}, {col2})")
+      }
+      Value::Mat4(m) => {
+        let col0 = m.col(0).compile()?;
+        let col1 = m.col(1).compile()?;
+        let col2 = m.col(2).compile()?;
+        let col3 = m.col(3).compile()?;
+        format!("mat4x4({col0}, {col1}, {col2}, {col3})")
+      }
+      Value::Texture2D(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Texture2DArray(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Texture3D(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+      Value::Cubemap(_) => {
+        // TODO: Convert to wgsl syntax.
+        format!("vec4<f32>(0.5, 0.5, 0., 1.)")
+      }
+    };
+    Ok(CompiledValue {
+      value,
+      dt: self.data_type(),
+    })
+  }
 
   fn is_dynamic(&self) -> bool {
     self.data_type().is_dynamic()

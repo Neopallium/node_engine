@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use egui::{self, NumExt};
@@ -138,6 +138,7 @@ struct NodeGraphMetaInner {
   zoom: f32,
   origin: emath::Vec2,
   sockets: HashMap<NodeSocketId, NodeSocket>,
+  outputs_changed: HashSet<OutputId>,
   frames: IndexMap<Uuid, NodeFrameState>,
   drag_state: NodeSocketDragState,
   selecting_state: NodeSelectingState,
@@ -195,6 +196,21 @@ impl NodeGraphMetaInner {
   pub fn update_node_socket(&mut self, socket: &mut NodeSocket, pos: egui::Pos2) {
     socket.center = self.ui_to_graph(pos);
     self.sockets.insert(socket.id, socket.clone());
+  }
+
+  pub fn update_output(&mut self, output_id: OutputId) {
+    self.outputs_changed.insert(output_id);
+  }
+
+  pub fn take_updated_outputs(&mut self) -> HashSet<OutputId> {
+    self.outputs_changed.drain().collect()
+  }
+
+  pub fn resolve_output(
+    &self,
+    output: &OutputId,
+  ) -> Option<DataType> {
+    self.sockets.get(&output.into()).map(|meta| meta.dt)
   }
 
   pub fn get_connection_meta(
@@ -310,6 +326,24 @@ impl NodeGraphMeta {
     inner.update_node_socket(socket, pos)
   }
 
+  pub fn update_output(&self, output_id: OutputId) {
+    let mut inner = self.0.write().unwrap();
+    inner.update_output(output_id)
+  }
+
+  pub fn take_updated_outputs(&self) -> HashSet<OutputId> {
+    let mut inner = self.0.write().unwrap();
+    inner.take_updated_outputs()
+  }
+
+  pub fn resolve_output(
+    &self,
+    output: &OutputId,
+  ) -> Option<DataType> {
+    let inner = self.0.read().unwrap();
+    inner.resolve_output(output)
+  }
+
   pub fn get_connection_meta(
     &self,
     input: &InputId,
@@ -348,9 +382,10 @@ impl NodeSocket {
     Self::new(id, connected, def.value_type, def.color)
   }
 
-  pub fn output(node: NodeId, idx: usize, def: &OutputDefinition) -> Self {
+  pub fn output(node: NodeId, idx: usize, def: &OutputDefinition, concrete_type: Option<DataType>) -> Self {
+    let dt = concrete_type.unwrap_or_else(|| def.value_type);
     let id = NodeSocketId::output(node, idx as _);
-    Self::new(id, false, def.value_type, def.color)
+    Self::new(id, false, dt, def.color)
   }
 
   pub fn new(
@@ -515,6 +550,10 @@ impl NodeSocketId {
       }
       _ => false,
     }
+  }
+
+  pub fn is_input(&self) -> bool {
+    self.as_input_id().is_some()
   }
 
   pub fn as_input_id(&self) -> Option<InputId> {

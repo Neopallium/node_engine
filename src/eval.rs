@@ -76,7 +76,7 @@ mod tests {
     let reg = NodeRegistry::build();
     println!("Build node graph");
     let mut graph = NodeGraph::new();
-    let scalar = reg.new_by_name("Scalar Math").expect("Scalar Math node");
+    let scalar = reg.new_by_name("Add").expect("add math node");
     let node1 = graph.add(scalar.duplicate());
     graph.set_node_input(node1, "A", 1.0.into())?;
     graph.set_node_input(node1, "B", 2.0.into())?;

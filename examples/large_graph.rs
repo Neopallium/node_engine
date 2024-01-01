@@ -30,7 +30,7 @@ fn build_sub_graph(
 }
 
 fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, NodeGraph, f32)> {
-  let scalar = reg.new_by_name("Scalar Math").expect("Scalar math node");
+  let scalar = reg.new_by_name("Add").expect("add math node");
   let mut graph = NodeGraph::new();
 
   let position = [max_depth as f32 * X_OFFSET, 0.].into();
