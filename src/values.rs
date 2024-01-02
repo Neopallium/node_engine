@@ -24,7 +24,6 @@ pub mod matrix;
 pub use matrix::*;
 
 pub mod texture;
-pub use texture::*;
 
 pub mod bindings;
 pub use bindings::*;
