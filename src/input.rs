@@ -135,7 +135,7 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, idx: usize, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) -> bool {
+  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
       match self.connected {
@@ -146,11 +146,11 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
               concrete_type.add_input_type(dt);
             }
           }
-          ui.add(NodeSocket::input(id, idx, true, def));
+          ui.add(NodeSocket::input(id, N, true, def));
           ui.label(&def.name);
         },
         None => {
-          ui.add(NodeSocket::input(id, idx, false, def));
+          ui.add(NodeSocket::input(id, N, false, def));
           ui.collapsing(&def.name, |ui| {
             changed = self.value.ui(ui);
           });

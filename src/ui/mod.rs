@@ -377,14 +377,14 @@ pub struct NodeSocket {
 }
 
 impl NodeSocket {
-  pub fn input(node: NodeId, idx: usize, connected: bool, def: &InputDefinition) -> Self {
-    let id = NodeSocketId::input(node, idx as _);
+  pub fn input(node: NodeId, idx: u32, connected: bool, def: &InputDefinition) -> Self {
+    let id = NodeSocketId::input(node, idx);
     Self::new(id, connected, def.value_type, def.color)
   }
 
-  pub fn output(node: NodeId, idx: usize, def: &OutputDefinition, concrete_type: Option<DataType>) -> Self {
+  pub fn output(node: NodeId, idx: u32, def: &OutputDefinition, concrete_type: Option<DataType>) -> Self {
     let dt = concrete_type.unwrap_or_else(|| def.value_type);
-    let id = NodeSocketId::output(node, idx as _);
+    let id = NodeSocketId::output(node, idx);
     Self::new(id, false, dt, def.color)
   }
 

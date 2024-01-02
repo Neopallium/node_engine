@@ -576,15 +576,15 @@ impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
 #[cfg(feature = "egui")]
 impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, idx: usize, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
+  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
     ui.horizontal(|ui| {
       ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         if self.is_dynamic() && self.update_concrete_type(concrete_type) {
           if let Some(graph) = NodeGraphMeta::get(ui) {
-            graph.update_output(OutputId::new(id, idx as _));
+            graph.update_output(OutputId::new(id, N));
           }
         }
-        ui.add(NodeSocket::output(id, idx, def, self.concrete_type));
+        ui.add(NodeSocket::output(id, N, def, self.concrete_type));
         ui.label(&def.name);
       });
     });

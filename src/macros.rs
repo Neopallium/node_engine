@@ -798,11 +798,11 @@ macro_rules! impl_node {
 
         #[cfg(feature = "egui")]
         fn inputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
-          let mut _defs = DEFINITION.inputs.values().enumerate();
+          let mut _defs = DEFINITION.inputs.values();
           let mut _updated = false;
           $(
-            if let Some((idx, def)) = _defs.next() {
-              if self.$field_input_name.ui(_concrete_type, idx, def, _ui, _id) {
+            if let Some(def) = _defs.next() {
+              if self.$field_input_name.ui(_concrete_type, def, _ui, _id) {
                 _updated = true;
               }
             }
@@ -812,10 +812,10 @@ macro_rules! impl_node {
 
         #[cfg(feature = "egui")]
         fn outputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
-          let mut _defs = DEFINITION.outputs.values().enumerate();
+          let mut _defs = DEFINITION.outputs.values();
           $(
-            if let Some((idx, def)) = _defs.next() {
-              self.$field_output_name.ui(_concrete_type, idx, def, _ui, _id);
+            if let Some(def) = _defs.next() {
+              self.$field_output_name.ui(_concrete_type, def, _ui, _id);
             }
           )*
           false
