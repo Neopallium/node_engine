@@ -124,7 +124,9 @@ impl NodeRegistryInner {
 
   fn register(&mut self, def: &NodeDefinition) -> Option<NodeDefinition> {
     let category = self.categories.get_category_mut(def.category.as_slice());
-    category.add_node(def.name.clone(), def.id);
+    if !def.deprecated {
+      category.add_node(def.name.clone(), def.id);
+    }
     self.name_to_id.insert(def.name.clone(), def.id);
     self.nodes.insert(def.id, def.clone())
   }
@@ -287,6 +289,7 @@ pub struct NodeDefinition {
   pub description: String,
   pub docs: String,
   pub category: Vec<String>,
+  pub deprecated: bool,
   pub parameters: IndexMap<String, ParameterDefinition>,
   pub inputs: IndexMap<String, InputDefinition>,
   pub outputs: IndexMap<String, OutputDefinition>,
@@ -315,7 +318,7 @@ impl NodeDefinition {
   }
 
   pub fn matches(&self, filter: &NodeFilter) -> bool {
-    self
+    !self.deprecated && self
       .name
       .to_lowercase()
       .contains(&filter.name.to_lowercase())

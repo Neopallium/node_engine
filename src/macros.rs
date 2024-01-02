@@ -621,6 +621,9 @@ macro_rules! impl_node {
           , category: $node_category:expr
         )?
         $(
+          , deprecated: $node_deprecated:expr
+        )?
+        $(
           , custom: {
             $( $custom_field_name:ident: $custom_field_value:literal ),*
             $(,)?
@@ -667,6 +670,9 @@ macro_rules! impl_node {
           $( def.description = $node_description.to_string(); )?
           $(
             def.category = $node_category.iter().map(|c| c.to_string()).collect();
+          )?
+          $(
+            def.deprecated = $node_deprecated;
           )?
           def.inputs = [
             $( InputDefinition::typed::<$field_input_ty>(stringify!($field_input_name)) ),*

@@ -10,12 +10,14 @@ repository = "https://github.com/Neopallium/node_engine"
 homepage = "https://github.com/Neopallium/node_engine"
 
 [features]
-default = ["egui", "math_nodes", "shader_nodes"]
+default = ["egui", "math_nodes", "shader_nodes", "bevy"]
 
 egui = ["dep:egui", "egui_extras"]
 
 math_nodes = []
 shader_nodes = []
+
+bevy = ["dep:bevy", "shader_nodes"]
 
 [dependencies]
 anyhow = "1.0"
@@ -39,6 +41,8 @@ heck = "0.4"
 glam = { version = "0.24", features = ["serde"] }
 indexmap = { version = "2.0", features = ["serde"] }
 uuid = { version = "1.4", features = ["v4", "v5", "serde"] }
+
+bevy = { version = "0.12", optional = true, default-features = false, features = ["bevy_asset", "bevy_render", "bevy_pbr"] }
 
 [dev-dependencies]
 criterion = "0.5"
