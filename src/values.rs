@@ -334,6 +334,7 @@ impl OutputDefinition {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ParameterDataType {
   Value(DataType),
+  Text(String),
   Select(IndexSet<String>),
 }
 
@@ -345,6 +346,7 @@ impl ParameterDataType {
   pub fn default_value(&self) -> ParameterValue {
     match self {
       Self::Value(dt) => ParameterValue::Value(dt.default_value()),
+      Self::Text(val) => ParameterValue::Text(val.clone()),
       Self::Select(values) => {
         let val = values.first().cloned().unwrap_or_default();
         ParameterValue::Selected(val)
@@ -356,6 +358,7 @@ impl ParameterDataType {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ParameterValue {
   Value(Value),
+  Text(String),
   Selected(String),
 }
 
@@ -363,6 +366,7 @@ impl ParameterValue {
   pub fn parameter_data_type(&self) -> ParameterDataType {
     match self {
       Self::Value(val) => ParameterDataType::Value(val.data_type()),
+      Self::Text(val) => ParameterDataType::Text(val.clone()),
       Self::Selected(val) => ParameterDataType::Select([val].into_iter().cloned().collect()),
     }
   }

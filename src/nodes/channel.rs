@@ -34,10 +34,62 @@ impl_node! {
     impl NodeImpl for SplitNode {
       fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let input = self.resolve_inputs(graph, compile)?;
-        self.r.compile(compile, id, "split_node", format!("{input}.r"), DataType::F32)?;
-        self.g.compile(compile, id, "split_node", format!("{input}.g"), DataType::F32)?;
-        self.b.compile(compile, id, "split_node", format!("{input}.b"), DataType::F32)?;
-        self.a.compile(compile, id, "split_node", format!("{input}.a"), DataType::F32)?;
+        let (r, g, b, a) = match input.dt {
+          DataType::F32 => {
+            (format!("{input}"), "0.".to_string(), "0.".to_string(), "0.".to_string())
+          },
+          DataType::Vec2 => {
+            (format!("{input}.r"), format!("{input}.g"), "0.".to_string(), "0.".to_string())
+          },
+          DataType::Vec3 => {
+            (format!("{input}.r"), format!("{input}.g"), format!("{input}.b"), "0.".to_string())
+          },
+          DataType::Vec4 => {
+            (format!("{input}.r"), format!("{input}.g"), format!("{input}.b"), format!("{input}.a"))
+          },
+          _ => {
+            return Err(anyhow::anyhow!("Unsupported input data type: {input:?}"));
+          }
+        };
+        self.r.compile(compile, id, "split_node_r", r, DataType::F32)?;
+        self.g.compile(compile, id, "split_node_g", g, DataType::F32)?;
+        self.b.compile(compile, id, "split_node_b", b, DataType::F32)?;
+        self.a.compile(compile, id, "split_node_a", a, DataType::F32)?;
+        Ok(())
+      }
+    }
+  }
+}
+
+impl_node! {
+  mod swizzle_node {
+    NodeInfo {
+      name: "Swizzle",
+      category: ["Channel"],
+    }
+
+    /// Swizzle the input vector into it's components.
+    #[derive(Default)]
+    pub struct SwizzleNode {
+      /// Input value.
+      pub input: Input<DynamicVector>,
+      /// Swizzle mask.
+      pub swizzle: Param<SwizzleMask>,
+      /// Output value.
+      pub out: Output<DynamicVector>,
+    }
+
+    impl SwizzleNode {
+      pub fn new() -> Self {
+        Default::default()
+      }
+    }
+
+    impl NodeImpl for SwizzleNode {
+      fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
+        let input = self.resolve_inputs(graph, compile)?;
+        let out = self.swizzle.compile(input)?;
+        self.out.compile(compile, id, "swizzle_node", out.value, out.dt)?;
         Ok(())
       }
     }
@@ -79,9 +131,9 @@ impl_node! {
     impl NodeImpl for CombineNode {
       fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let (r, g, b, a) = self.resolve_inputs(graph, compile)?;
-        self.rgba.compile(compile, id, "combine_node", format!("vec4<f32>({r}, {g}, {b}, {a})"), DataType::Vec4)?;
-        self.rgb.compile(compile, id, "combine_node", format!("vec3<f32>({r}, {g}, {b})"), DataType::Vec3)?;
-        self.rg.compile(compile, id, "combine_node", format!("vec2<f32>({r}, {g})"), DataType::Vec2)?;
+        self.rgba.compile(compile, id, "combine_node_rgba", format!("vec4<f32>({r}, {g}, {b}, {a})"), DataType::Vec4)?;
+        self.rgb.compile(compile, id, "combine_node_rgb", format!("vec3<f32>({r}, {g}, {b})"), DataType::Vec3)?;
+        self.rg.compile(compile, id, "combine_node_rg", format!("vec2<f32>({r}, {g})"), DataType::Vec2)?;
         Ok(())
       }
     }

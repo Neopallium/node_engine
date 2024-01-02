@@ -45,12 +45,14 @@ impl_node! {
   mod view_direction_node {
     NodeInfo {
       name: "View direction",
-      category: ["Input"],
+      category: ["Input", "Geometry"],
     }
 
     /// Vertex or Fragment View Direction vector.
     #[derive(Default)]
     pub struct ViewDirectionNode {
+      /// Coordinate space of view direction.
+      pub space: Param<CoordSpace>,
       /// View Direction.
       pub view_direction: Output<Vec3>,
     }
@@ -59,12 +61,34 @@ impl_node! {
       pub fn new() -> Self {
         Default::default()
       }
+
+      fn world(&self, compile: &mut NodeGraphCompile) -> Result<String> {
+        compile.add_local("world_view_dir", "in.world_position.xyz - view.world_position".into(), DataType::Vec3)
+      }
+
+      fn tangent(&self, compile: &mut NodeGraphCompile) -> Result<String> {
+        let world = self.world(compile)?;
+        compile.add_local("tangent_view_dir", format!(r#"vec3(
+	dot({world}, in.world_tangent.xyz),
+	dot({world}, normalize(cross(in.world_tangent.xyz, in.world_normal))),
+	dot({world}, in.world_normal)
+)"#), DataType::Vec3)
+      }
     }
 
     impl NodeImpl for ViewDirectionNode {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
+        let code = match self.space {
+          CoordSpace::World => {
+            self.world(compile)?
+          }
+          CoordSpace::Tangent => {
+            self.tangent(compile)?
+          }
+          _ => "todo".to_string(),
+        };
         // TODO: add context lookups.
-        self.view_direction.compile(compile, id, "view_direction_node", format!("in.uv"), DataType::Vec3)
+        self.view_direction.compile(compile, id, "view_direction_node", code, DataType::Vec3)
       }
     }
   }
@@ -74,7 +98,7 @@ impl_node! {
   mod uv_node {
     NodeInfo {
       name: "UV",
-      category: ["Input"],
+      category: ["UV"],
     }
 
     /// The vertex/fragment UV value.
@@ -94,6 +118,41 @@ impl_node! {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         // TODO: add context lookups.
         self.uv.compile(compile, id, "uv_node", format!("in.uv"), DataType::Vec2)
+      }
+    }
+  }
+}
+
+impl_node! {
+  mod tiling_offset_node {
+    NodeInfo {
+      name: "Tiling and Offset",
+      category: ["UV"],
+    }
+
+    /// Tiling and Offset Node.
+    #[derive(Default)]
+    pub struct TilingOffsetNode {
+      /// Input UV.
+      pub uv: Input<UV>,
+      /// The tiling to apply.
+      pub tiling: Input<Vec2>,
+      /// The offset to apply.
+      pub offset: Input<Vec2>,
+      /// Output UV value.
+      pub out: Output<Vec2>,
+    }
+
+    impl TilingOffsetNode {
+      pub fn new() -> Self {
+        Default::default()
+      }
+    }
+
+    impl NodeImpl for TilingOffsetNode {
+      fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
+        let (uv, tiling, offset) = self.resolve_inputs(graph, compile)?;
+        self.out.compile(compile, id, "tiling_offset_node", format!("fract({uv} * {tiling} + {offset})"), DataType::Vec2)
       }
     }
   }

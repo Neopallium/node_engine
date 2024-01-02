@@ -287,6 +287,11 @@ impl NodeGraphCompile {
     self.blocks.get_mut(&id)
   }
 
+  pub fn add_local(&mut self, prefix: &str, code: String, dt: DataType) -> Result<String> {
+    let block = self.current_block()?;
+    Ok(block.add_local(prefix, code, dt))
+  }
+
   pub fn add_output(&mut self, id: OutputId, prefix: &str, code: String, dt: DataType) -> Result<()> {
     let block = self.current_block()?;
     block.add_output(id, prefix, code, dt);

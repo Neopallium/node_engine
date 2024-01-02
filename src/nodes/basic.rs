@@ -11,15 +11,11 @@ impl_node! {
       category: ["Input", "Basic"],
     }
 
-    pub enum Boolean {
-      False,
-      True,
-    }
-
     /// A constant boolean value.
     #[derive(Default)]
     pub struct BoolNode {
-      pub value: Param<Boolean>,
+      /// Boolean constant.
+      pub value: Param<bool>,
       /// Output.
       pub out: Output<f32>,
     }
@@ -32,9 +28,10 @@ impl_node! {
 
     impl NodeImpl for BoolNode {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
-        let value = match self.value {
-          Boolean::False => "0.0",
-          Boolean::True => "1.0",
+        let value = if self.value {
+          "1.0"
+        } else {
+          "0.0"
         }.to_string();
         self.out.compile(compile, id, "bool_node", value, DataType::F32)
       }
