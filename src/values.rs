@@ -427,6 +427,15 @@ where
     let val = T::default();
     ParameterDataType::Value(val.data_type())
   }
+
+  #[cfg(feature = "egui")]
+  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId) -> bool {
+    ui.horizontal(|ui| {
+      ui.label(&def.name);
+      self.ui(ui)
+    })
+    .inner
+  }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

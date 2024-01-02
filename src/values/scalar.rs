@@ -2,6 +2,43 @@ use anyhow::{anyhow, Result};
 
 use crate::*;
 
+impl ValueType for bool {
+  fn clone_value(&self) -> Box<dyn ValueType> {
+    Box::new(self.clone())
+  }
+
+  fn to_value(&self) -> Value {
+    if *self {
+      Value::U32(1)
+    } else {
+      Value::U32(0)
+    }
+  }
+
+  fn set_value(&mut self, value: Value) -> Result<()> {
+    let val: u32 = match value {
+      Value::I32(v) => v as _,
+      Value::U32(v) => v,
+      Value::F32(v) => v as _,
+      Value::Vec2(v) => v.x as _,
+      Value::Vec3(v) => v.x as _,
+      Value::Vec4(v) => v.x as _,
+      _ => return Err(anyhow!("Expected a boolean value got: {value:?}")),
+    };
+    *self = val == 1;
+    Ok(())
+  }
+
+  fn data_type(&self) -> DataType {
+    DataType::U32
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui) -> bool {
+    ui.checkbox(self, "bool").changed()
+  }
+}
+
 impl ValueType for i32 {
   fn clone_value(&self) -> Box<dyn ValueType> {
     Box::new(self.clone())
