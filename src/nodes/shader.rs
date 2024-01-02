@@ -33,7 +33,7 @@ impl_node! {
         let (uv, _tex) = self.resolve_inputs(graph, compile)?;
         // TODO: add context lookups.
         let code = format!("textureSample(texture, texture_sampler, {uv})");
-        compile.add_output(id.into(), "texture_node", code, DataType::Vec4)
+        self.rgba.compile(compile, id, "texture_node", code, DataType::Vec4)
       }
     }
   }
@@ -64,7 +64,7 @@ impl_node! {
     impl NodeImpl for UVNode {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         // TODO: add context lookups.
-        compile.add_output(id.into(), "uv_node", format!("in.uv"), DataType::Vec2)
+        self.uv.compile(compile, id, "uv_node", format!("in.uv"), DataType::Vec2)
       }
     }
   }

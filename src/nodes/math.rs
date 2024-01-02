@@ -38,7 +38,7 @@ macro_rules! impl_dyn_vec_binary_node {
           ) -> Result<()> {
             let (a, b) = self.resolve_inputs(graph, compile)?;
             let code = format!($op, a, b);
-            compile.add_output(id.into(), stringify!($mod_name), code, a.dt)
+            self.out.compile(compile, id, stringify!($mod_name), code, a.dt)
           }
         }
       }
@@ -88,7 +88,7 @@ macro_rules! impl_dyn_vec_unary_node {
           ) -> Result<()> {
             let a = self.resolve_inputs(graph, compile)?;
             let code = format!($op, a);
-            compile.add_output(id.into(), stringify!($mod_name), code, a.dt)
+            self.out.compile(compile, id, stringify!($mod_name), code, a.dt)
           }
         }
       }
@@ -137,7 +137,7 @@ impl_node! {
           // default to using the type of `a`.
           _ => (format!("({a} * {b})"), a.dt),
         };
-        compile.add_output(id.into(), "multiply_node", code, out_dt)
+        self.out.compile(compile, id, "multiply_node", code, out_dt)
       }
     }
   }

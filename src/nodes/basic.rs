@@ -36,7 +36,7 @@ impl_node! {
           Boolean::False => "0.0",
           Boolean::True => "1.0",
         }.to_string();
-        compile.add_output(id.into(), "bool_node", value, DataType::F32)
+        self.out.compile(compile, id, "bool_node", value, DataType::F32)
       }
     }
   }
@@ -66,7 +66,7 @@ impl_node! {
     impl NodeImpl for ColorNode {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let value = self.value.compile()?.to_string();
-        compile.add_output(id.into(), "color_node", value, DataType::Vec4)
+        self.out.compile(compile, id, "color_node", value, DataType::Vec4)
       }
     }
   }
@@ -96,7 +96,7 @@ impl_node! {
     impl NodeImpl for FloatNode {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let value = self.value.compile()?.to_string();
-        compile.add_output(id.into(), "float_node", value, DataType::F32)
+        self.out.compile(compile, id, "float_node", value, DataType::F32)
       }
     }
   }
@@ -126,7 +126,7 @@ impl_node! {
     impl NodeImpl for Vec2Node {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let value = self.value.compile()?.to_string();
-        compile.add_output(id.into(), "vector2_node", value, DataType::Vec2)
+        self.out.compile(compile, id, "vector2_node", value, DataType::Vec2)
       }
     }
   }
@@ -156,7 +156,7 @@ impl_node! {
     impl NodeImpl for Vec3Node {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let value = self.value.compile()?.to_string();
-        compile.add_output(id.into(), "vector3_node", value, DataType::Vec3)
+        self.out.compile(compile, id, "vector3_node", value, DataType::Vec3)
       }
     }
   }
@@ -186,7 +186,7 @@ impl_node! {
     impl NodeImpl for Vec4Node {
       fn compile(&self, _graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let value = self.value.compile()?.to_string();
-        compile.add_output(id.into(), "vector4_node", value, DataType::Vec4)
+        self.out.compile(compile, id, "vector4_node", value, DataType::Vec4)
       }
     }
   }

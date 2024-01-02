@@ -34,10 +34,10 @@ impl_node! {
     impl NodeImpl for SplitNode {
       fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let input = self.resolve_inputs(graph, compile)?;
-        compile.add_output(OutputId::new(id, 0), "split_node", format!("{input}.r"), DataType::F32)?;
-        compile.add_output(OutputId::new(id, 1), "split_node", format!("{input}.g"), DataType::F32)?;
-        compile.add_output(OutputId::new(id, 2), "split_node", format!("{input}.b"), DataType::F32)?;
-        compile.add_output(OutputId::new(id, 3), "split_node", format!("{input}.a"), DataType::F32)?;
+        self.r.compile(compile, id, "split_node", format!("{input}.r"), DataType::F32)?;
+        self.g.compile(compile, id, "split_node", format!("{input}.g"), DataType::F32)?;
+        self.b.compile(compile, id, "split_node", format!("{input}.b"), DataType::F32)?;
+        self.a.compile(compile, id, "split_node", format!("{input}.a"), DataType::F32)?;
         Ok(())
       }
     }
@@ -79,9 +79,9 @@ impl_node! {
     impl NodeImpl for CombineNode {
       fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile, id: NodeId) -> Result<()> {
         let (r, g, b, a) = self.resolve_inputs(graph, compile)?;
-        compile.add_output(OutputId::new(id, 0), "combine_node", format!("vec4<f32>({r}, {g}, {b}, {a})"), DataType::Vec4)?;
-        compile.add_output(OutputId::new(id, 1), "combine_node", format!("vec3<f32>({r}, {g}, {b})"), DataType::Vec3)?;
-        compile.add_output(OutputId::new(id, 2), "combine_node", format!("vec2<f32>({r}, {g})"), DataType::Vec2)?;
+        self.rgba.compile(compile, id, "combine_node", format!("vec4<f32>({r}, {g}, {b}, {a})"), DataType::Vec4)?;
+        self.rgb.compile(compile, id, "combine_node", format!("vec3<f32>({r}, {g}, {b})"), DataType::Vec3)?;
+        self.rg.compile(compile, id, "combine_node", format!("vec2<f32>({r}, {g})"), DataType::Vec2)?;
         Ok(())
       }
     }
