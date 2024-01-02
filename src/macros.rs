@@ -610,7 +610,7 @@ macro_rules! impl_node {
   (@normalize
     mod $mod_name:ident {
       {
-        name: $node_name:literal
+        name: $($node_name_ident:ident)? $($node_name:literal)?
         $(
           , description: $node_description:literal
         )?
@@ -659,13 +659,15 @@ macro_rules! impl_node {
         pub static ref DEFINITION: $crate::NodeDefinition = {
           // Use the module_path to generate the node definition id.
           let path = module_path!();
-          let mut def = $crate::NodeDefinition::new($node_name, path, |_, data| {
+          let mut def = $crate::NodeDefinition::new(stringify!($node_ty_name), path, |_, data| {
             use $crate::serde::Deserialize;
             Ok(Box::new(match data {
               Some(data) => $node_ty_name::deserialize(data)?,
               None => $node_ty_name::new(),
             }))
           });
+          $( def.set_node_type_name(stringify!($node_name_ident));)?
+          $( def.set_node_type_name($node_name);)?
           def.set_docs($node_struct_doc);
           $( def.description = $node_description.to_string(); )?
           $(

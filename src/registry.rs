@@ -2,6 +2,7 @@ use core::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use heck::ToTitleCase;
 use indexmap::IndexMap;
 
 use uuid::Uuid;
@@ -310,7 +311,7 @@ impl NodeDefinition {
     let package = module_path.split("::").next();
     Self {
       id,
-      name: name.to_string(),
+      name: name.to_title_case(),
       package: package.map(|p| p.to_string()).unwrap_or_default(),
       builder: Arc::new(Box::new(NodeBuilderFn(create))),
       ..Default::default()
@@ -338,6 +339,14 @@ impl NodeDefinition {
 
   pub fn inputs(&self) -> impl Iterator<Item = (&String, &InputDefinition)> {
     self.inputs.iter()
+  }
+
+  pub fn set_node_type_name(&mut self, ty_name: &str) {
+    if let Some(name) = ty_name.strip_suffix("Node") {
+      self.name = name.to_title_case();
+    } else {
+      self.name = ty_name.to_title_case();
+    }
   }
 
   pub fn set_docs(&mut self, docs: &str) {

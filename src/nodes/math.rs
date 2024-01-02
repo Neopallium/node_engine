@@ -3,12 +3,75 @@ use anyhow::Result;
 use crate::*;
 
 #[macro_export]
+macro_rules! impl_dyn_vec_trinary_node {
+  ( $mod_name:ident, $ty_name:ident, $docs:expr, $op:expr ) => {
+    $crate::impl_dyn_vec_trinary_node!($mod_name, $ty_name, $docs, a, "Input `A`.", b, "Input `B`.", c, "Input `C`.", $op);
+  };
+  ( $mod_name:ident, $ty_name:ident, $docs:expr, $a:ident, $a_doc:expr, $b:ident, $b_doc:expr, $c:ident, $c_doc:expr, $op:expr ) => {
+    $crate::impl_node! {
+      mod $mod_name {
+        NodeInfo {
+          name: $ty_name,
+          category: ["Math", "Basic"],
+        }
+
+        #[doc = $docs]
+        #[derive(Default)]
+        pub struct $ty_name {
+          #[doc = $a_doc]
+          pub $a: Input<DynamicVector>,
+          #[doc = $b_doc]
+          pub $b: Input<DynamicVector>,
+          #[doc = $c_doc]
+          pub $c: Input<DynamicVector>,
+          /// Output `out`.
+          pub out: Output<DynamicVector>,
+        }
+
+        impl $ty_name {
+          pub fn new() -> Self {
+            Default::default()
+          }
+        }
+
+        impl NodeImpl for $ty_name {
+          fn compile(
+            &self,
+            graph: &NodeGraph,
+            compile: &mut NodeGraphCompile,
+            id: NodeId,
+          ) -> Result<()> {
+            let (a, b, c) = self.resolve_inputs(graph, compile)?;
+            let code = format!($op, a, b, c);
+            self.out.compile(compile, id, stringify!($mod_name), code, a.dt)
+          }
+        }
+      }
+    }
+  };
+}
+impl_dyn_vec_trinary_node!(
+  lerp_node, LerpNode, "Linearly interpolating between inputs A and B by input T.",
+  a, "Input A",
+  b, "Input B",
+  t, "Input T",
+  "mix({}, {}, {})"
+);
+impl_dyn_vec_trinary_node!(
+  clamp_node, ClampNode, "Clamp input between `min` and `max`.",
+  input, "Unclamped input value",
+  min, "Minimum value",
+  max, "Maximum value",
+  "clamp({}, {}, {})"
+);
+
+#[macro_export]
 macro_rules! impl_dyn_vec_binary_node {
   ( $mod_name:ident, $ty_name:ident, $name:expr, $docs:expr, $op:expr ) => {
     $crate::impl_node! {
       mod $mod_name {
         NodeInfo {
-          name: $name,
+          name: $ty_name,
           category: ["Math", "Basic"],
         }
 
@@ -142,4 +205,3 @@ impl_node! {
     }
   }
 }
-
