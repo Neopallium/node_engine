@@ -4,17 +4,16 @@ use crate::*;
 
 #[macro_export]
 macro_rules! impl_dyn_vec_binary_node {
-  ( $mod_name:ident, $ty_name:ident, $name:expr, $desp:expr, $op:expr ) => {
+  ( $mod_name:ident, $ty_name:ident, $name:expr, $docs:expr, $op:expr ) => {
     $crate::impl_node! {
       mod $mod_name {
         NodeInfo {
           name: $name,
-          description: $desp,
           category: ["Math", "Basic"],
         }
 
+        #[doc = $docs]
         #[derive(Default)]
-        #[doc = $desp]
         pub struct $ty_name {
           /// Input `A`.
           pub a: Input<DynamicVector>,
@@ -65,8 +64,8 @@ macro_rules! impl_dyn_vec_unary_node {
           category: ["Math", "Basic"],
         }
 
-        #[derive(Default)]
         #[doc = $desp]
+        #[derive(Default)]
         pub struct $ty_name {
           /// Input `A`.
           pub a: Input<DynamicVector>,
@@ -108,7 +107,6 @@ impl_node! {
   mod multiply_node {
     NodeInfo {
       name: "Multiply",
-      description: "Multiply vectors and matrixes",
       category: ["Math", "Basic"],
     }
 

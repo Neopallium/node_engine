@@ -39,7 +39,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
   let (size, id) = build_sub_graph(&scalar, &mut graph, position, max_depth)?;
 
   let mut frag = reg
-    .new_by_name("Fragment output")
+    .new_by_name("Fragment")
     .expect("Fragment output node");
   frag.set_position(position);
   let output_id = graph.add(frag);

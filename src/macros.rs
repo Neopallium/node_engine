@@ -163,7 +163,52 @@ macro_rules! impl_node {
       }
     }
   };
-  // Parse Node struct.
+  // Parse Node struct with docs.
+  (@normalize
+    mod $mod_name:ident {
+      { $( $node_info:tt )* }
+      { $( $extra_code:tt )* }
+      [ $( $node_inputs:tt )* ]
+      [ $( $node_parameters:tt )* ]
+      [ $( $node_outputs:tt )* ]
+      [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
+      []
+      {}
+      { $( $node_impl:tt )* }
+      { $( $node_trait_impl:tt )* }
+      #[doc = $node_struct_doc:expr]
+      $(#[$node_struct_attr:meta])*
+      pub struct $node_ty_name:ident {
+        $($unparsed_fields:tt)*
+      }
+      $($rest:tt)*
+    }
+  ) => {
+    $crate::impl_node! {
+      @normalize_fields
+      mod $mod_name {
+        { $( $node_info )* }
+        { $( $extra_code )* }
+        [ $( $node_inputs )* ]
+        [ $( $node_parameters )* ]
+        [ $( $node_outputs )* ]
+        [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
+        []
+        {
+          #[doc = $node_struct_doc]
+          $(#[$node_struct_attr])*
+          pub struct $node_ty_name;
+        }
+        { $( $node_impl )* }
+        { $( $node_trait_impl )* }
+        ___internal_parse_fields {
+            $($unparsed_fields)*
+        }
+        $($rest)*
+      }
+    }
+  };
+  // Parse Node struct without docs.
   (@normalize
     mod $mod_name:ident {
       { $( $node_info:tt )* }
@@ -194,6 +239,7 @@ macro_rules! impl_node {
         [ $( $count_inputs )* ] [ $( $count_params )* ] [ $( $count_outputs )* ]
         []
         {
+          #[doc = ""]
           $(#[$node_struct_attr])*
           pub struct $node_ty_name;
         }
@@ -589,6 +635,7 @@ macro_rules! impl_node {
       [ $( $count_inputs:tt )* ] [ $( $count_params:tt )* ] [ $( $count_outputs:tt )* ]
       [ $( $node_struct_fields:tt )* ]
       {
+        #[doc = $node_struct_doc:expr]
         $(#[$node_struct_attr:meta])*
         pub struct $node_ty_name:ident;
       }
@@ -616,6 +663,7 @@ macro_rules! impl_node {
               None => $node_ty_name::new(),
             }))
           });
+          def.set_docs($node_struct_doc);
           $( def.description = $node_description.to_string(); )?
           $(
             def.category = $node_category.iter().map(|c| c.to_string()).collect();
@@ -663,6 +711,7 @@ macro_rules! impl_node {
 
       $( $extra_code )*
 
+      #[doc = $node_struct_doc]
       $(#[$node_struct_attr])*
       #[derive(Clone, Debug)]
       #[derive($crate::serde::Serialize, $crate::serde::Deserialize)]
@@ -853,7 +902,6 @@ mod test {
     mod test_node {
       NodeInfo {
         name: "Test Node",
-        description: "Some long description",
         category: ["Test"],
         // Define some custom fields in the node definition.
         custom: {
@@ -864,7 +912,7 @@ mod test {
         },
       }
 
-      /// Test docs.
+      /// Document for `Op` parameter enum.
       pub enum Op {
         /// Math add op description.
         Add,
@@ -872,7 +920,9 @@ mod test {
         Sub,
       }
 
-      /// Docs.
+      /// Node short description.
+      ///
+      /// Longer node docs...
       #[derive(Default)]
       pub struct TestNode {
         /// Input `color`.

@@ -285,6 +285,7 @@ pub struct NodeDefinition {
   pub name: String,
   pub package: String,
   pub description: String,
+  pub docs: String,
   pub category: Vec<String>,
   pub parameters: IndexMap<String, ParameterDefinition>,
   pub inputs: IndexMap<String, InputDefinition>,
@@ -334,6 +335,16 @@ impl NodeDefinition {
 
   pub fn inputs(&self) -> impl Iterator<Item = (&String, &InputDefinition)> {
     self.inputs.iter()
+  }
+
+  pub fn set_docs(&mut self, docs: &str) {
+    if docs.is_empty() {
+      return;
+    }
+    if let Some(desp) = docs.split("\n").next() {
+      self.description = desp.trim().to_string();
+    }
+    self.docs = docs.trim().to_string();
   }
 
   pub fn set_input_color(&mut self, idx: u32, color: Option<u32>) {

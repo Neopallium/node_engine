@@ -8,7 +8,6 @@ impl_node! {
   mod bool_node {
     NodeInfo {
       name: "Boolean",
-      description: "A boolean value as F32 0.0 (false) or 1.0 (true)",
       category: ["Input", "Basic"],
     }
 
@@ -47,7 +46,6 @@ impl_node! {
   mod color_node {
     NodeInfo {
       name: "Color",
-      description: "A constant Color",
       category: ["Input", "Basic"],
     }
 
@@ -78,7 +76,6 @@ impl_node! {
   mod float_node {
     NodeInfo {
       name: "Float",
-      description: "A constant float",
       category: ["Input", "Basic"],
     }
 
@@ -109,7 +106,6 @@ impl_node! {
   mod vector2_node {
     NodeInfo {
       name: "Vector 2",
-      description: "A constant Vector 2",
       category: ["Input", "Basic"],
     }
 
@@ -140,7 +136,6 @@ impl_node! {
   mod vector3_node {
     NodeInfo {
       name: "Vector 3",
-      description: "A constant Vector 3",
       category: ["Input", "Basic"],
     }
 
@@ -171,7 +166,6 @@ impl_node! {
   mod vector4_node {
     NodeInfo {
       name: "Vector 4",
-      description: "A constant Vector 4",
       category: ["Input", "Basic"],
     }
 

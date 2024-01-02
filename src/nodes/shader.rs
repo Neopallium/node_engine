@@ -8,11 +8,10 @@ impl_node! {
   mod texture_sample {
     NodeInfo {
       name: "Texture Sample",
-      description: "Texture sampler",
       category: ["Input"],
     }
 
-    /// Texture node.
+    /// Texture sampler.
     #[derive(Default)]
     pub struct TextureNode {
       /// UV.
@@ -44,8 +43,7 @@ impl_node! {
   mod uv_node {
     NodeInfo {
       name: "UV",
-      description: "Vertex or Fragment UV",
-      category: ["UV"],
+      category: ["Input"],
     }
 
     /// The vertex/fragment UV value.
@@ -76,7 +74,6 @@ impl_node! {
   mod fragment_output_node {
     NodeInfo {
       name: "Fragment",
-      description: "Fragment shader node",
       category: ["Output"],
     }
 
