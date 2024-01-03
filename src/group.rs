@@ -85,6 +85,10 @@ impl NodeFrame for NodeGroup {
       }
     }
     resp.context_menu(|ui| {
+      if ui.button("Add selected nodes").clicked() {
+        action = Some(NodeAction::JoinGroup(self.id));
+        ui.close_menu();
+      }
       if ui.button("Delete group").clicked() {
         action = Some(NodeAction::Delete(false));
         ui.close_menu();

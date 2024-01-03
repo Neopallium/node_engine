@@ -25,6 +25,8 @@ pub enum NodeAction {
   Delete(bool),
   /// Remove a node from a group.
   LeaveGroup(Uuid),
+  /// Add selected nodes to the group.
+  JoinGroup(Uuid),
 }
 
 #[derive(Clone, Debug)]

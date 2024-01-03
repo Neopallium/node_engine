@@ -484,6 +484,7 @@ impl NodeGraph {
 
       // Render groups.
       let mut remove_group = None;
+      let mut resize_groups = BTreeSet::new();
       for (group_id, group) in &mut self.groups.0 {
         match state.render(ui, group) {
           Some(NodeAction::Dragged(delta)) => {
@@ -497,6 +498,14 @@ impl NodeGraph {
           Some(NodeAction::Delete(nodes)) => {
             remove_group = Some((*group_id, nodes));
           }
+          Some(NodeAction::JoinGroup(group_id)) => {
+            for node_id in self.ui_state.take_selected() {
+              if let Some(node) = self.nodes.0.get_mut(&node_id) {
+                node.group_id = group_id;
+              }
+            }
+            resize_groups.insert(group_id);
+          }
           _ => (),
         }
       }
@@ -506,7 +515,6 @@ impl NodeGraph {
 
       // Render nodes.
       let mut remove_node = None;
-      let mut resize_groups = BTreeSet::new();
       let mut updated = false;
       for (node_id, node) in &mut self.nodes.0 {
         match state.render(ui, node) {
@@ -521,7 +529,7 @@ impl NodeGraph {
           Some(NodeAction::LeaveGroup(group_id)) => {
             resize_groups.insert(group_id);
           }
-          None => (),
+          _ => (),
         }
         updated |= node.updated;
       }
