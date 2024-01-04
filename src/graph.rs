@@ -439,6 +439,8 @@ impl NodeGraph {
 
     // Show scroll area.
     let out = scroll_area.show(ui, |ui| {
+      // Id for selecting nodes or dragging connections.
+      let id = ui.next_auto_id();
       // Save old node style.
       let old_node_style = NodeStyle::get(ui);
 
@@ -466,7 +468,6 @@ impl NodeGraph {
       let mut area_resp = None;
       let mut select_state = None;
       if selecting {
-        let id = ui.next_auto_id();
         let rect = ui.available_rect_before_wrap();
         let resp = ui.interact(rect, id, egui::Sense::click_and_drag());
         state.selecting_mut(|selecting| {
@@ -558,13 +559,13 @@ impl NodeGraph {
         self.resize_group(group_id);
       }
 
-      // Check if a connection was being dragged.
-      if let Some((src, dst)) = state.get_dropped_node_sockets() {
+      // Check if a connection is being dragged.
+      state.drag_state_mut(|drag| {
         // Handle connecting/disconnecting.
-        if ui.input(|i| i.pointer.any_released()) {
-          state.clear_dropped_node_sockets();
-          // Make sure the input is first and that the sockets are compatible.
-          if let Some((src, dst)) = src.input_id_first(dst) {
+        if ui.memory(|m| m.is_being_dragged(id)) && ui.input(|i| i.pointer.any_released()) {
+          ui.memory_mut(|m| m.stop_dragging());
+          // The connection was dropped, take the sockets and check that they are compatible.
+          if let Some((src, dst)) = drag.take_sockets() {
             if let Some((dst, dt)) = dst {
               // Connect.
               if let Err(err) = self.connect(src, dst, dt) {
@@ -577,9 +578,10 @@ impl NodeGraph {
               }
             }
           }
-        } else {
+        } else if let Some(src) = &drag.src {
+          ui.memory_mut(|m| m.set_dragged_id(id));
           // Still dragging a connection.
-          if dst.is_some() {
+          if drag.dst.is_some() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
           } else {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
@@ -591,13 +593,19 @@ impl NodeGraph {
             }
           }
           if let Some(end) = ui.ctx().pointer_latest_pos() {
+            // Try to scroll with the mouse pointer during the drag.
+            if let Some(last) = drag.pointer_last_pos {
+              let delta = (last - end) * 2.0;
+              ui.scroll_with_delta(delta);
+            }
+            drag.pointer_last_pos = Some(end);
             let center = (src.center * zoom).to_pos2() + ui_min;
             let mut stroke = node_style.line_stroke;
             stroke.color = src.color;
             ui.painter().line_segment([center, end], stroke);
           }
         }
-      }
+      });
 
       // Unload the graph state from egui.
       state.unload(ui);

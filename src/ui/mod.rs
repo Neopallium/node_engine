@@ -119,16 +119,21 @@ impl NodeSelectingState {
 pub struct NodeSocketDragState {
   pub src: Option<NodeSocket>,
   pub dst: Option<NodeSocket>,
+  pub pointer_last_pos: Option<emath::Pos2>,
 }
 
 impl NodeSocketDragState {
-  pub fn get_dropped_node_sockets(&self) -> Option<(NodeSocket, Option<NodeSocket>)> {
-    self.src.clone().map(|src| (src, self.dst.clone()))
+  pub fn is_dragging(&self) -> bool {
+    self.src.is_some()
   }
 
-  pub fn clear_dropped_node_sockets(&mut self) {
-    self.src = None;
-    self.dst = None;
+  pub fn take_sockets(
+    &mut self,
+  ) -> Option<(InputId, Option<(OutputId, DataType)>)> {
+    let src = self.src.take()?;
+    let dst = self.dst.take();
+    self.pointer_last_pos = None;
+    src.input_id_first(dst)
   }
 }
 
@@ -293,14 +298,9 @@ impl NodeGraphMeta {
     inner.drag_state = state;
   }
 
-  pub fn get_dropped_node_sockets(&self) -> Option<(NodeSocket, Option<NodeSocket>)> {
-    let inner = self.0.read().unwrap();
-    inner.drag_state.get_dropped_node_sockets()
-  }
-
-  pub fn clear_dropped_node_sockets(&self) {
+  pub fn drag_state_mut<R>(&self, writer: impl FnOnce(&mut NodeSocketDragState) -> R) -> R {
     let mut inner = self.0.write().unwrap();
-    inner.drag_state.clear_dropped_node_sockets();
+    writer(&mut inner.drag_state)
   }
 
   pub fn remove_node(&self, node_id: NodeId) {
