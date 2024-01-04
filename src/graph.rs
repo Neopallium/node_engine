@@ -145,6 +145,86 @@ impl GetId for NodeGraphProperty {
   }
 }
 
+#[derive(Clone, Debug)]
+pub struct NodeFinder {
+  pub registry: NodeRegistry,
+  pub node_filter: NodeFilter,
+  open: Option<emath::Pos2>,
+  size: emath::Vec2,
+}
+
+impl Default for NodeFinder {
+  fn default() -> Self {
+    Self {
+      registry: NodeRegistry::build(),
+      node_filter: Default::default(),
+      open: None,
+      size: (400., 600.).into(),
+    }
+  }
+}
+
+impl NodeFinder {
+  pub fn open_at(&mut self, pos: emath::Pos2) {
+    eprintln!("Open NodeFinder at: {pos:?}");
+    self.open = Some(pos);
+  }
+
+  pub fn close(&mut self) {
+    self.open = None;
+  }
+
+  pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<Node> {
+    let pos = self.open?;
+
+    eprintln!("Show NodeFinder at: {pos:?}, clip={:?}", ui.clip_rect());
+    let rect = emath::Rect::from_min_size(pos, self.size);
+
+    // Create a child ui area.
+    let mut child_ui = ui.child_ui(rect, *ui.layout());
+    let ui = &mut child_ui;
+
+    let node = self.frame_ui(ui);
+    if node.is_some() {
+      // A node was selected close the finder.
+      self.close();
+    } else {
+      /*
+      let size = ui.min_rect().size();
+      if self.size != size {
+        eprintln!("Resize NodeFinder: new={size:?}, old={:?}", self.size);
+        self.size = size;
+      }
+      */
+    }
+    node
+  }
+
+  // Draw a frame around the node finder UI.
+  fn frame_ui(
+    &mut self,
+    ui: &mut egui::Ui,
+  ) -> Option<Node> {
+    // Window-style frame.
+    let style = ui.style();
+    let mut frame = egui::Frame::window(style);
+    frame.shadow = Default::default();
+
+    let mut node = None;
+    frame.show(ui, |ui| {
+      ui.vertical(|ui| {
+        // Title bar.
+        ui.label("Create node");
+        // Node filter UI.
+        self.node_filter.ui(ui);
+        // Show available nodes from registry.
+        node = self.registry.ui(ui, &self.node_filter);
+      });
+    });
+    node
+  }
+}
+
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
   id: Uuid,
@@ -159,6 +239,8 @@ pub struct NodeGraph {
   #[serde(skip)]
   #[cfg(feature = "egui")]
   ui_state: NodeGraphMeta,
+  #[serde(skip)]
+  node_finder: NodeFinder,
 }
 
 impl NodeGraph {
@@ -358,6 +440,12 @@ impl NodeGraph {
 
 #[cfg(feature = "egui")]
 impl NodeGraph {
+  pub fn open_node_finder(&mut self, ui: &egui::Ui) {
+    if let Some(pos) = ui.ctx().pointer_latest_pos() {
+      self.node_finder.open_at(pos);
+    }
+  }
+
   pub fn group_selected_nodes(&mut self) -> Option<NodeGroupId> {
     let mut group = NodeGroup::new();
 
@@ -441,6 +529,7 @@ impl NodeGraph {
     let out = scroll_area.show(ui, |ui| {
       // Id for selecting nodes or dragging connections.
       let id = ui.next_auto_id();
+
       // Save old node style.
       let old_node_style = NodeStyle::get(ui);
 
@@ -473,6 +562,8 @@ impl NodeGraph {
         state.selecting_mut(|selecting| {
           if resp.drag_started() {
             selecting.drag_started(pointer_pos, clear_selected);
+            // Close the NodeFinder on clicks.
+            self.node_finder.close();
           } else if resp.drag_released() {
             selecting.drag_released();
           } else {
@@ -633,8 +724,13 @@ impl NodeGraph {
         selecting.ui(ui);
       }
 
-      // Restore old NodeStyle.
-      old_node_style.set(ui);
+      // Restore old NodeStyle and unzoom
+      old_node_style.unzoom_style(ui, zoom);
+
+      // Show the node finder if it is open.
+      if let Some(node) = self.node_finder.ui(ui) {
+        self.add(node);
+      }
 
       area_resp
     });
@@ -651,8 +747,6 @@ pub struct NodeGraphEditor {
   pub title: String,
   pub size: emath::Vec2,
   pub graph: NodeGraph,
-  pub registry: NodeRegistry,
-  pub node_filter: NodeFilter,
 }
 
 #[cfg(feature = "egui")]
@@ -662,8 +756,6 @@ impl Default for NodeGraphEditor {
       title: "Graph editor".to_string(),
       size: (900., 500.).into(),
       graph: Default::default(),
-      registry: NodeRegistry::build(),
-      node_filter: Default::default(),
     }
   }
 }
@@ -689,14 +781,10 @@ impl NodeGraphEditor {
         if let Some(resp) = out.inner {
           // Graph menu.
           resp.context_menu(|ui| {
-            ui.menu_button("Create node", |ui| {
-              // Node filter UI.
-              self.node_filter.ui(ui);
-              if let Some(node) = self.registry.ui(ui, &self.node_filter) {
-                self.graph.add(node);
-                ui.close_menu();
-              }
-            });
+            if ui.button("Create node").clicked() {
+              self.graph.open_node_finder(ui);
+              ui.close_menu();
+            }
             if ui.button("Group Nodes").clicked() {
               self.graph.group_selected_nodes();
               ui.close_menu();

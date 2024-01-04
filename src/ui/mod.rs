@@ -54,6 +54,11 @@ impl NodeStyle {
     ui.data_mut(|d| d.insert_temp(egui::Id::new(NODE_STYLE), self.clone()));
   }
 
+  pub fn unzoom_style(&self, ui: &mut egui::Ui, zoom: f32) {
+    ui.style_mut().zoom(1.0 / zoom);
+    self.set(ui);
+  }
+
   pub fn zoom_style(ui: &mut egui::Ui, zoom: f32) -> Self {
     ui.style_mut().zoom(zoom);
     ui.data_mut(|d| {
