@@ -18,7 +18,9 @@ pub struct EditorState {
   zoom: f32,
   scroll_offset: emath::Vec2,
   #[serde(skip)]
-  current_pos: Option<emath::Vec2>,
+  graph_pointer_pos: Option<emath::Vec2>,
+  #[serde(skip)]
+  add_node_at: Option<emath::Vec2>,
 }
 
 impl Default for EditorState {
@@ -30,7 +32,8 @@ impl Default for EditorState {
       origin,
       zoom: 0.5,
       scroll_offset: origin - emath::vec2(450., 250.),
-      current_pos: None,
+      graph_pointer_pos: None,
+      add_node_at: None,
     }
   }
 }
@@ -149,8 +152,8 @@ impl GetId for NodeGraphProperty {
 pub struct NodeFinder {
   pub registry: NodeRegistry,
   pub node_filter: NodeFilter,
-  open: Option<emath::Pos2>,
-  size: emath::Vec2,
+  open: bool,
+  open_at: Option<emath::Pos2>,
 }
 
 impl Default for NodeFinder {
@@ -158,44 +161,39 @@ impl Default for NodeFinder {
     Self {
       registry: NodeRegistry::build(),
       node_filter: Default::default(),
-      open: None,
-      size: (400., 600.).into(),
+      open: false,
+      open_at: None,
     }
   }
 }
 
 impl NodeFinder {
   pub fn open_at(&mut self, pos: emath::Pos2) {
-    eprintln!("Open NodeFinder at: {pos:?}");
-    self.open = Some(pos);
+    self.open_at = Some(pos);
+    self.open = true;
   }
 
   pub fn close(&mut self) {
-    self.open = None;
+    self.open = false;
+    self.open_at = None;
   }
 
   pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<Node> {
-    let pos = self.open?;
+    if !self.open {
+      return None;
+    }
 
-    eprintln!("Show NodeFinder at: {pos:?}, clip={:?}", ui.clip_rect());
-    let rect = emath::Rect::from_min_size(pos, self.size);
-
-    // Create a child ui area.
-    let mut child_ui = ui.child_ui(rect, *ui.layout());
-    let ui = &mut child_ui;
-
-    let node = self.frame_ui(ui);
+    let mut area = egui::Area::new("NodeFinder");
+    if let Some(pos) = self.open_at.take() {
+      area = area.current_pos(pos);
+    }
+    let node = area
+      .show(ui.ctx(), |ui| {
+        self.frame_ui(ui)
+      }).inner;
     if node.is_some() {
       // A node was selected close the finder.
       self.close();
-    } else {
-      /*
-      let size = ui.min_rect().size();
-      if self.size != size {
-        eprintln!("Resize NodeFinder: new={size:?}, old={:?}", self.size);
-        self.size = size;
-      }
-      */
     }
     node
   }
@@ -306,7 +304,7 @@ impl NodeGraph {
 
   pub fn add(&mut self, mut node: Node) -> NodeId {
     self.updated();
-    if let Some(position) = &self.editor.current_pos {
+    if let Some(position) = &self.editor.add_node_at {
       node.set_position(*position);
     }
     // Check for duplicate node ids.
@@ -442,6 +440,7 @@ impl NodeGraph {
 impl NodeGraph {
   pub fn open_node_finder(&mut self, ui: &egui::Ui) {
     if let Some(pos) = ui.ctx().pointer_latest_pos() {
+      self.editor.add_node_at = self.editor.graph_pointer_pos;
       self.node_finder.open_at(pos);
     }
   }
@@ -473,6 +472,11 @@ impl NodeGraph {
   }
 
   pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<egui::Response> {
+    // Show the node finder if it is open.
+    if let Some(node) = self.node_finder.ui(ui) {
+      self.add(node);
+    }
+
     let mut scrolling = true;
     let mut selecting = true;
     let mut clear_selected = true;
@@ -550,7 +554,7 @@ impl NodeGraph {
       if let Some(pos) = ui.ctx().pointer_latest_pos() {
         pointer_pos = pos;
         if ui.ui_contains_pointer() {
-          self.editor.current_pos = Some((pos - origin).to_vec2() / zoom);
+          self.editor.graph_pointer_pos = Some((pos - origin).to_vec2() / zoom);
         }
       }
       // When not scrolling, detect click and drag to select nodes.
@@ -726,11 +730,6 @@ impl NodeGraph {
 
       // Restore old NodeStyle and unzoom
       old_node_style.unzoom_style(ui, zoom);
-
-      // Show the node finder if it is open.
-      if let Some(node) = self.node_finder.ui(ui) {
-        self.add(node);
-      }
 
       area_resp
     });
