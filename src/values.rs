@@ -392,7 +392,7 @@ pub trait ParameterType {
   fn parameter_data_type() -> ParameterDataType;
 
   #[cfg(feature = "egui")]
-  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId) -> bool {
+  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
     ui.horizontal(|ui| {
       let mut value = self.get_param();
       ui.label(&def.name);
@@ -433,7 +433,7 @@ where
   }
 
   #[cfg(feature = "egui")]
-  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId) -> bool {
+  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
     ui.horizontal(|ui| {
       ui.label(&def.name);
       self.ui(ui)
@@ -589,7 +589,7 @@ impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
 #[cfg(feature = "egui")]
 impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId) {
+  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId, details: bool) {
     ui.horizontal(|ui| {
       ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         if self.is_dynamic() && self.update_concrete_type(concrete_type) {
@@ -597,7 +597,9 @@ impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
             graph.update_output(OutputId::new(id, N));
           }
         }
-        ui.add(NodeSocket::output(id, N, def, self.concrete_type));
+        if !details {
+          ui.add(NodeSocket::output(id, N, def, self.concrete_type));
+        }
         ui.label(&def.name);
       });
     });

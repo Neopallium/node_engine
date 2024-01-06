@@ -216,54 +216,78 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize + Send + Sync {
   }
 
   #[cfg(feature = "egui")]
-  fn ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
+  fn details_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
+    self.ui(ui, id, true)
+  }
+
+  #[cfg(feature = "egui")]
+  fn node_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
+    self.ui(ui, id, false)
+  }
+
+  #[cfg(feature = "egui")]
+  fn ui(&mut self, ui: &mut egui::Ui, id: NodeId, details: bool) -> bool {
     let def = self.def();
     let input_count = def.inputs.len();
-    let output_count = def.outputs.len();
     let param_count = def.parameters.len();
     let node_style = NodeStyle::get(ui);
     let zoom = node_style.zoom;
     let mut concrete_type = NodeConcreteType::default();
     let mut updated = false;
-    ui.vertical(|ui| {
-      ui.horizontal(|ui| {
-        if input_count > 0 {
-          ui.vertical(|ui| {
-            if self.inputs_ui(&mut concrete_type, ui, id) {
-              updated = true;
-            }
-          });
-        }
-        if output_count > 0 {
-          if input_count > 0 {
-            ui.separator();
-          }
-          ui.vertical(|ui| {
-            ui.set_min_width(50.0 * zoom);
-            if self.outputs_ui(&mut concrete_type, ui, id) {
-              updated = true;
-            }
-          });
-        }
-      });
+    if details {
+      if self.inputs_ui(&mut concrete_type, ui, id, details) {
+        updated = true;
+      }
       if param_count > 0 {
-        ui.separator();
-        if self.parameters_ui(&mut concrete_type, ui, id) {
+        if input_count > 0 {
+          ui.separator();
+        }
+        if self.parameters_ui(&mut concrete_type, ui, id, details) {
           updated = true;
         }
       }
-    });
+    } else {
+      let output_count = def.outputs.len();
+      ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+          if input_count > 0 {
+            ui.vertical(|ui| {
+              if self.inputs_ui(&mut concrete_type, ui, id, details) {
+                updated = true;
+              }
+            });
+          }
+          if output_count > 0 {
+            if input_count > 0 {
+              ui.separator();
+            }
+            ui.vertical(|ui| {
+              ui.set_min_width(50.0 * zoom);
+              if self.outputs_ui(&mut concrete_type, ui, id, details) {
+                updated = true;
+              }
+            });
+          }
+        });
+        if param_count > 0 {
+          ui.separator();
+          if self.parameters_ui(&mut concrete_type, ui, id, details) {
+            updated = true;
+          }
+        }
+      });
+    }
     updated
   }
 
   #[cfg(feature = "egui")]
-  fn inputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId) -> bool;
+  fn inputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId, details: bool) -> bool;
 
   #[cfg(feature = "egui")]
-  fn parameters_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, _id: NodeId) -> bool;
+  fn parameters_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, _id: NodeId, details: bool) -> bool;
 
   #[cfg(feature = "egui")]
-  fn outputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId) -> bool;
+  fn outputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId, details: bool) -> bool;
 }
 
 impl Serialize for dyn NodeImpl {
@@ -413,6 +437,11 @@ impl Node {
     self.updated = true;
     self.node.set_node_input(&idx.into(), value)
   }
+
+  #[cfg(feature = "egui")]
+  pub fn details_ui(&mut self, ui: &mut egui::Ui, id: NodeId) -> bool {
+    self.node.details_ui(ui, id)
+  }
 }
 
 #[cfg(feature = "egui")]
@@ -452,7 +481,7 @@ impl NodeFrame for Node {
       .fill(egui::Color32::from_gray(63))
       .show(ui, |ui| {
         ui.set_min_width(node_style.node_min_size.x);
-        if self.node.ui(ui, self.id) {
+        if self.node.node_ui(ui, self.id) {
           self.updated = true;
         }
       });

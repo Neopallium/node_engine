@@ -501,19 +501,19 @@ impl NodeGraph {
   }
 
   pub fn show(&mut self, ui: &mut egui::Ui) {
-    self.show_right(ui);
-    self.show_center(ui);
+    self.show_details(ui);
+    self.show_graph(ui);
   }
 
-  pub fn show_right(&mut self, ui: &mut egui::Ui) {
+  pub fn show_details(&mut self, ui: &mut egui::Ui) {
     // Note: Without this side panel, the central panel will not work with a ScrollArea.
-    egui::SidePanel::right("graph_right_panel")
+    egui::SidePanel::right("graph_details_panel")
       .min_width(150.0)
       .resizable(false)
-      .show_inside(ui, |ui| self.ui_right(ui));
+      .show_inside(ui, |ui| self.details_ui(ui));
   }
 
-  pub fn ui_right(&mut self, ui: &mut egui::Ui) {
+  pub fn details_ui(&mut self, ui: &mut egui::Ui) {
     if let Some(id) = self.details_state.selected_node {
       if let Some(node) = self.nodes.0.get_mut(&id) {
         ui.vertical(|ui| {
@@ -521,6 +521,7 @@ impl NodeGraph {
             ui.label("Name:");
             ui.text_edit_singleline(&mut node.name);
           });
+          node.details_ui(ui, id);
         });
       }
     } else {
@@ -529,8 +530,8 @@ impl NodeGraph {
     }
   }
 
-  pub fn show_center(&mut self, ui: &mut egui::Ui) {
-    egui::CentralPanel::default().show_inside(ui, |ui| self.ui_center(ui));
+  pub fn show_graph(&mut self, ui: &mut egui::Ui) {
+    egui::CentralPanel::default().show_inside(ui, |ui| self.graph_ui(ui));
   }
 
   fn handle_clicked(&mut self, clear_on_click: bool) {
@@ -540,7 +541,7 @@ impl NodeGraph {
     }
   }
 
-  pub fn ui_center(&mut self, ui: &mut egui::Ui) {
+  pub fn graph_ui(&mut self, ui: &mut egui::Ui) {
     // Show the node finder if it is open.
     if let Some(node) = self.node_finder.ui(ui) {
       self.add(node);

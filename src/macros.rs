@@ -805,12 +805,12 @@ macro_rules! impl_node {
         }
 
         #[cfg(feature = "egui")]
-        fn inputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
+        fn inputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
           let mut _defs = DEFINITION.inputs.values();
           let mut _updated = false;
           $(
             if let Some(def) = _defs.next() {
-              if self.$field_input_name.ui(_concrete_type, def, _ui, _id) {
+              if self.$field_input_name.ui(_concrete_type, def, _ui, _id, _details) {
                 _updated = true;
               }
             }
@@ -819,23 +819,23 @@ macro_rules! impl_node {
         }
 
         #[cfg(feature = "egui")]
-        fn outputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
+        fn outputs_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
           let mut _defs = DEFINITION.outputs.values();
           $(
             if let Some(def) = _defs.next() {
-              self.$field_output_name.ui(_concrete_type, def, _ui, _id);
+              self.$field_output_name.ui(_concrete_type, def, _ui, _id, _details);
             }
           )*
           false
         }
 
         #[cfg(feature = "egui")]
-        fn parameters_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId) -> bool {
+        fn parameters_ui(&mut self, _concrete_type: &mut NodeConcreteType, _ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
           let mut _defs = DEFINITION.parameters.values();
           let mut _updated = false;
           $(
             if let Some(def) = _defs.next() {
-              if self.$field_param_name.parameter_ui(def, _ui, _id) {
+              if self.$field_param_name.parameter_ui(def, _ui, _id, _details) {
                 _updated = true;
               }
             }

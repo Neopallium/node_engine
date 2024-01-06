@@ -114,7 +114,7 @@ impl ParameterType for SwizzleMask {
   }
 
   #[cfg(feature = "egui")]
-  fn parameter_ui(&mut self, _def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId) -> bool {
+  fn parameter_ui(&mut self, _def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
     ui.horizontal(|ui| {
       ui.label("Swizzle mask");
       let resp = ui.add(egui::TextEdit::singleline(&mut self.0).hint_text("Mask"));

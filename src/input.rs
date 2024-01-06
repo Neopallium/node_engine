@@ -135,30 +135,36 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId) -> bool {
+  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId, details: bool) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
-      match self.connected {
-        Some((output_id, mut dt)) => {
-          if self.is_dynamic() {
-            dt = NodeGraphMeta::get(ui).and_then(|g| g.resolve_output(&output_id));
-            if let Some(dt) = dt {
-              concrete_type.add_input_type(dt);
+      if details {
+        ui.collapsing(&def.name, |ui| {
+          changed = self.value.ui(ui);
+        });
+      } else {
+        match self.connected {
+          Some((output_id, mut dt)) => {
+            if self.is_dynamic() {
+              dt = NodeGraphMeta::get(ui).and_then(|g| g.resolve_output(&output_id));
+              if let Some(dt) = dt {
+                concrete_type.add_input_type(dt);
+              }
             }
-          }
-          let mut socket = NodeSocket::input(id, N, true, def);
-          if let Some(dt) = dt {
-            socket.set_data_type(dt);
-          }
-          ui.add(socket);
-          ui.label(&def.name);
-        },
-        None => {
-          ui.add(NodeSocket::input(id, N, false, def));
-          ui.collapsing(&def.name, |ui| {
-            changed = self.value.ui(ui);
-          });
-        },
+            let mut socket = NodeSocket::input(id, N, true, def);
+            if let Some(dt) = dt {
+              socket.set_data_type(dt);
+            }
+            ui.add(socket);
+            ui.label(&def.name);
+          },
+          None => {
+            ui.add(NodeSocket::input(id, N, false, def));
+            ui.collapsing(&def.name, |ui| {
+              changed = self.value.ui(ui);
+            });
+          },
+        }
       }
     });
     changed
