@@ -101,7 +101,14 @@ impl NodeConnection {
     (pos * self.zoom).to_pos2() + self.ui_min
   }
 
-  pub fn draw(&self, ui: &mut egui::Ui, start: emath::Pos2, end: emath::Pos2, color: Option<ecolor::Color32>, highlight: bool) -> Option<emath::Rect> {
+  pub fn draw(
+    &self,
+    ui: &mut egui::Ui,
+    start: emath::Pos2,
+    end: emath::Pos2,
+    color: Option<ecolor::Color32>,
+    highlight: bool,
+  ) -> Option<emath::Rect> {
     let mut offset = (start - end) * 0.2;
     offset.x = self.curve_offset + offset.y.abs() + offset.x.abs();
     let start2 = start - offset;
@@ -123,7 +130,6 @@ impl NodeConnection {
       let rect = rect.expand(margin);
       match ui.ctx().pointer_latest_pos() {
         Some(pointer) if rect.contains(pointer) => {
-
           let tolerance = (start.x - end.x).abs() * 0.001;
           let mut last = start;
           shape.for_each_flattened_with_t(tolerance, &mut |pos, _t| {
@@ -152,7 +158,10 @@ impl NodeConnection {
     if ui.is_rect_visible(rect) {
       let mut painter = ui.painter().clone();
       if hover {
-        painter = painter.with_layer_id(egui::layers::LayerId::new(egui::layers::Order::Foreground, id));
+        painter = painter.with_layer_id(egui::layers::LayerId::new(
+          egui::layers::Order::Foreground,
+          id,
+        ));
       }
       painter.add(shape);
     }
@@ -223,9 +232,7 @@ impl NodeSocketDragState {
     self.src.is_some()
   }
 
-  pub fn take_sockets(
-    &mut self,
-  ) -> Option<(InputId, Option<(OutputId, DataType)>)> {
+  pub fn take_sockets(&mut self) -> Option<(InputId, Option<(OutputId, DataType)>)> {
     let src = self.src.take()?;
     let dst = self.dst.take();
     self.pointer_last_pos = None;
@@ -316,10 +323,7 @@ impl NodeGraphMetaInner {
     self.outputs_changed.drain().collect()
   }
 
-  pub fn resolve_output(
-    &self,
-    output: &OutputId,
-  ) -> Option<DataType> {
+  pub fn resolve_output(&self, output: &OutputId) -> Option<DataType> {
     self.sockets.get(&output.into()).map(|meta| meta.dt)
   }
 
@@ -446,10 +450,7 @@ impl NodeGraphMeta {
     inner.take_updated_outputs()
   }
 
-  pub fn resolve_output(
-    &self,
-    output: &OutputId,
-  ) -> Option<DataType> {
+  pub fn resolve_output(&self, output: &OutputId) -> Option<DataType> {
     let inner = self.0.read().unwrap();
     inner.resolve_output(output)
   }
@@ -492,7 +493,12 @@ impl NodeSocket {
     Self::new(id, connected, def.value_type, def.color)
   }
 
-  pub fn output(node: NodeId, idx: u32, def: &OutputDefinition, concrete_type: Option<DataType>) -> Self {
+  pub fn output(
+    node: NodeId,
+    idx: u32,
+    def: &OutputDefinition,
+    concrete_type: Option<DataType>,
+  ) -> Self {
     let dt = concrete_type.unwrap_or_else(|| def.value_type);
     let id = NodeSocketId::output(node, idx);
     Self::new(id, false, dt, def.color)

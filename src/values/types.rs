@@ -126,7 +126,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicVector => true,
         _ => false,
-      }
+      },
       Self::U32 => match other {
         Self::I32 => true,
         Self::U32 => true,
@@ -137,7 +137,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicVector => true,
         _ => false,
-      }
+      },
       Self::F32 => match other {
         Self::I32 => true,
         Self::U32 => true,
@@ -148,7 +148,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicVector => true,
         _ => false,
-      }
+      },
       Self::Vec2 => match other {
         Self::I32 => true,
         Self::U32 => true,
@@ -159,7 +159,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicVector => true,
         _ => false,
-      }
+      },
       Self::Vec3 => match other {
         Self::I32 => true,
         Self::U32 => true,
@@ -170,7 +170,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicVector => true,
         _ => false,
-      }
+      },
       Self::Vec4 => match other {
         Self::I32 => true,
         Self::U32 => true,
@@ -181,20 +181,20 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicVector => true,
         _ => false,
-      }
+      },
       Self::Mat2 => match other {
         Self::Mat2 => true,
         Self::Dynamic => true,
         Self::DynamicMatrix => true,
         _ => false,
-      }
+      },
       Self::Mat3 => match other {
         Self::Mat2 => true,
         Self::Mat3 => true,
         Self::Dynamic => true,
         Self::DynamicMatrix => true,
         _ => false,
-      }
+      },
       Self::Mat4 => match other {
         Self::Mat2 => true,
         Self::Mat3 => true,
@@ -202,7 +202,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicMatrix => true,
         _ => false,
-      }
+      },
       Self::Dynamic => match other {
         Self::I32 => true,
         Self::U32 => true,
@@ -217,7 +217,7 @@ impl DataType {
         Self::DynamicVector => true,
         Self::DynamicMatrix => true,
         _ => false,
-      }
+      },
       Self::DynamicVector => match other {
         Self::I32 => true,
         Self::U32 => true,
@@ -228,7 +228,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicVector => true,
         _ => false,
-      }
+      },
       Self::DynamicMatrix => match other {
         Self::Mat2 => true,
         Self::Mat3 => true,
@@ -236,7 +236,7 @@ impl DataType {
         Self::Dynamic => true,
         Self::DynamicMatrix => true,
         _ => false,
-      }
+      },
       _ => false,
     }
   }

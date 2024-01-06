@@ -26,7 +26,7 @@ impl_enum_parameter_type!(
 pub struct SwizzleMask(pub String);
 
 pub fn is_swizzle(ch: char) -> bool {
-  match ch  {
+  match ch {
     'x' | 'y' | 'z' | 'w' => true,
     'r' | 'g' | 'b' | 'a' => true,
     _ => false,
@@ -34,7 +34,7 @@ pub fn is_swizzle(ch: char) -> bool {
 }
 
 pub fn is_swizzle_limit(len: usize, ch: char) -> bool {
-  match ch  {
+  match ch {
     'x' | 'r' => true,
     'y' | 'g' if len > 1 => true,
     'z' | 'b' if len > 2 => true,
@@ -57,7 +57,10 @@ impl SwizzleMask {
     // Validate mask.
     let mask = self.0.replace(|ch| !is_swizzle_limit(len, ch), "");
     if mask != self.0 {
-      return Err(anyhow::anyhow!("Invalid swizzle mask: contains components not in the input: {}", self.0));
+      return Err(anyhow::anyhow!(
+        "Invalid swizzle mask: contains components not in the input: {}",
+        self.0
+      ));
     }
     let out_dt = match self.0.len() {
       4 => DataType::Vec4,
@@ -105,7 +108,9 @@ impl ParameterType for SwizzleMask {
         self.filter();
         Ok(())
       }
-      _ => Err(anyhow::anyhow!("Unsupport ParameterValue -> Value conversion.")),
+      _ => Err(anyhow::anyhow!(
+        "Unsupport ParameterValue -> Value conversion."
+      )),
     }
   }
 
@@ -114,7 +119,13 @@ impl ParameterType for SwizzleMask {
   }
 
   #[cfg(feature = "egui")]
-  fn parameter_ui(&mut self, _def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
+  fn parameter_ui(
+    &mut self,
+    _def: &ParameterDefinition,
+    ui: &mut egui::Ui,
+    _id: NodeId,
+    _details: bool,
+  ) -> bool {
     ui.horizontal(|ui| {
       ui.label("Swizzle mask");
       let resp = ui.add(egui::TextEdit::singleline(&mut self.0).hint_text("Mask"));

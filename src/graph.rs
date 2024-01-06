@@ -190,10 +190,7 @@ impl NodeFinder {
     if let Some(pos) = self.open_at.take() {
       area = area.current_pos(pos);
     }
-    let node = area
-      .show(ui.ctx(), |ui| {
-        self.frame_ui(ui)
-      }).inner;
+    let node = area.show(ui.ctx(), |ui| self.frame_ui(ui)).inner;
     if node.is_some() {
       // A node was selected close the finder.
       self.close();
@@ -202,10 +199,7 @@ impl NodeFinder {
   }
 
   // Draw a frame around the node finder UI.
-  fn frame_ui(
-    &mut self,
-    ui: &mut egui::Ui,
-  ) -> Option<Node> {
+  fn frame_ui(&mut self, ui: &mut egui::Ui) -> Option<Node> {
     // Window-style frame.
     let style = ui.style();
     let mut frame = egui::Frame::window(style);
@@ -772,11 +766,12 @@ impl NodeGraph {
   }
 
   fn context_menu(&mut self, ui: &mut egui::Ui) {
-    let state = self.menu_state.get_or_insert_with(|| {
-      MenuState {
+    let state = self
+      .menu_state
+      .get_or_insert_with(|| MenuState {
         hover_connection: self.hover_connection,
-      }
-    }).clone();
+      })
+      .clone();
     if ui.button("Create node").clicked() {
       self.open_node_finder(ui);
       ui.close_menu();
@@ -795,7 +790,13 @@ impl NodeGraph {
     }
   }
 
-  fn render_connections(&mut self, ui: &mut egui::Ui, id: egui::Id, state: &NodeGraphMeta, conn: NodeConnection) {
+  fn render_connections(
+    &mut self,
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    state: &NodeGraphMeta,
+    conn: NodeConnection,
+  ) {
     //let zoom = style.zoom;
     // Check if a connection is being dragged.
     state.drag_state_mut(|drag| {
@@ -858,7 +859,10 @@ impl NodeGraph {
       if let Some((in_meta, out_meta)) = meta {
         let start = conn.to_ui_pos(in_meta.center);
         let end = conn.to_ui_pos(out_meta.center);
-        if conn.draw(ui, start, end, Some(out_meta.color), true).is_some() {
+        if conn
+          .draw(ui, start, end, Some(out_meta.color), true)
+          .is_some()
+        {
           self.hover_connection = Some(*input);
         }
       }

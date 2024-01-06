@@ -26,7 +26,7 @@ impl CompiledValue {
       // Same data type, no conversion.
       (from, to) if from == to => {
         return Ok(());
-      },
+      }
       (DataType::Dynamic, _) => {
         return Err(anyhow!("Dynamic compiled values are not supported"));
       }
@@ -44,7 +44,7 @@ impl CompiledValue {
       (DataType::I32, DataType::Vec4) => format!("vec4<f32>({})", self.value),
       (DataType::I32, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
-      },
+      }
       // From U32
       (DataType::U32, DataType::I32) => format!("i32({})", self.value),
       (DataType::U32, DataType::F32) => format!("f32({})", self.value),
@@ -53,7 +53,7 @@ impl CompiledValue {
       (DataType::U32, DataType::Vec4) => format!("vec4<f32>({})", self.value),
       (DataType::U32, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
-      },
+      }
       // From F32
       (DataType::F32, DataType::I32) => format!("i32({})", self.value),
       (DataType::F32, DataType::U32) => format!("u32({})", self.value),
@@ -62,61 +62,70 @@ impl CompiledValue {
       (DataType::F32, DataType::Vec4) => format!("vec4<f32>({})", self.value),
       (DataType::F32, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
-      },
+      }
       // From Vec2
-      (DataType::Vec2, DataType::I32) =>  format!("i32({}.x)", self.value),
-      (DataType::Vec2, DataType::U32) =>  format!("u32({}.x)", self.value),
-      (DataType::Vec2, DataType::F32) =>  format!("f32({}.x)", self.value),
+      (DataType::Vec2, DataType::I32) => format!("i32({}.x)", self.value),
+      (DataType::Vec2, DataType::U32) => format!("u32({}.x)", self.value),
+      (DataType::Vec2, DataType::F32) => format!("f32({}.x)", self.value),
       (DataType::Vec2, DataType::Vec3) => format!("vec3<f32>({}.xy, 0.)", self.value),
       (DataType::Vec2, DataType::Vec4) => format!("vec4<f32>({}.xy, 0., 1.)", self.value),
       (DataType::Vec2, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
-      },
+      }
       // From Vec3
-      (DataType::Vec3, DataType::I32) =>  format!("i32({}.x)", self.value),
-      (DataType::Vec3, DataType::U32) =>  format!("u32({}.x)", self.value),
-      (DataType::Vec3, DataType::F32) =>  format!("f32({}.x)", self.value),
+      (DataType::Vec3, DataType::I32) => format!("i32({}.x)", self.value),
+      (DataType::Vec3, DataType::U32) => format!("u32({}.x)", self.value),
+      (DataType::Vec3, DataType::F32) => format!("f32({}.x)", self.value),
       (DataType::Vec3, DataType::Vec2) => format!("vec2<f32>({}.xy)", self.value),
       (DataType::Vec3, DataType::Vec4) => format!("vec4<f32>({}.xyz, 1.)", self.value),
       (DataType::Vec3, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
-      },
+      }
       // From Vec4
-      (DataType::Vec4, DataType::I32) =>  format!("i32({}.x)", self.value),
-      (DataType::Vec4, DataType::U32) =>  format!("u32({}.x)", self.value),
-      (DataType::Vec4, DataType::F32) =>  format!("f32({}.x)", self.value),
+      (DataType::Vec4, DataType::I32) => format!("i32({}.x)", self.value),
+      (DataType::Vec4, DataType::U32) => format!("u32({}.x)", self.value),
+      (DataType::Vec4, DataType::F32) => format!("f32({}.x)", self.value),
       (DataType::Vec4, DataType::Vec2) => format!("vec2<f32>({}.xy)", self.value),
       (DataType::Vec4, DataType::Vec3) => format!("vec4<f32>({}.xyz)", self.value),
       (DataType::Vec4, DataType::Dynamic | DataType::DynamicVector) => {
         return Ok(());
-      },
+      }
       // From Mat2
       (DataType::Mat2, DataType::Mat3) => {
         return Err(anyhow!("Promoting Mat2 to Mat3 not supported."));
-      },
+      }
       (DataType::Mat2, DataType::Mat4) => {
         return Err(anyhow!("Promoting Mat2 to Mat4 not supported."));
-      },
+      }
       (DataType::Mat2, DataType::Dynamic | DataType::DynamicMatrix) => {
         return Ok(());
-      },
+      }
       // From Mat3
-      (DataType::Mat3, DataType::Mat2) => format!("mat2x2<f32>({}[0].xy, {}[1].xy)", self.value, self.value),
+      (DataType::Mat3, DataType::Mat2) => {
+        format!("mat2x2<f32>({}[0].xy, {}[1].xy)", self.value, self.value)
+      }
       (DataType::Mat3, DataType::Mat4) => {
         return Err(anyhow!("Promoting Mat3 to Mat4 not supported."));
-      },
+      }
       (DataType::Mat3, DataType::Dynamic | DataType::DynamicMatrix) => {
         return Ok(());
-      },
+      }
       // From Mat4
-      (DataType::Mat4, DataType::Mat2) => format!("mat2x2<f32>({}[0].xy, {}[1].xy)", self.value, self.value),
-      (DataType::Mat4, DataType::Mat3) => format!("mat3x3<f32>({}[0].xyz, {}[1].xyz, {}[2].xyz)", self.value, self.value, self.value),
+      (DataType::Mat4, DataType::Mat2) => {
+        format!("mat2x2<f32>({}[0].xy, {}[1].xy)", self.value, self.value)
+      }
+      (DataType::Mat4, DataType::Mat3) => format!(
+        "mat3x3<f32>({}[0].xyz, {}[1].xyz, {}[2].xyz)",
+        self.value, self.value, self.value
+      ),
       (DataType::Mat4, DataType::Dynamic | DataType::DynamicMatrix) => {
         return Ok(());
-      },
+      }
       // Unsupport conversions
       (from_dt, to_dt) => {
-        return Err(anyhow!("Conversion from {from_dt:?} to {to_dt:?} not supported."));
+        return Err(anyhow!(
+          "Conversion from {from_dt:?} to {to_dt:?} not supported."
+        ));
       }
     };
     self.dt = to_dt;
@@ -151,27 +160,28 @@ impl CodeBlock {
     let name = format!("{prefix}_{idx}");
     self.append(format!(
       r#"
-  let {name} = {code};"#));
+  let {name} = {code};"#
+    ));
     self.variables.insert(name.clone(), dt);
     name
   }
 
   pub fn add_output(&mut self, id: OutputId, prefix: &str, code: String, dt: DataType) {
-    self.outputs.insert(id, NodeOutput::LazyCode(
-      prefix.to_string(), code, dt
-    ));
+    self
+      .outputs
+      .insert(id, NodeOutput::LazyCode(prefix.to_string(), code, dt));
   }
 
   pub fn resolve_output(&mut self, id: OutputId) -> Result<CompiledValue> {
-    let output = self.outputs.get(&id)
+    let output = self
+      .outputs
+      .get(&id)
       .ok_or_else(|| anyhow!("Tried to resolve an unknown output: {id:?}"))?;
     // Generate the output if it hasn't already been generated.
     let value = match output.clone() {
       NodeOutput::LazyCode(prefix, code, dt) => {
         let name = self.add_local(&prefix, code, dt);
-        let value = CompiledValue {
-          value: name, dt
-        };
+        let value = CompiledValue { value: name, dt };
         // Mark the output as generated and reference the variable.
         self.outputs.insert(id, NodeOutput::Compiled(value.clone()));
         Ok(value)
@@ -182,15 +192,10 @@ impl CodeBlock {
   }
 
   pub fn append_output(&mut self, node: NodeId, code: String) {
-    let id = OutputId {
-      node,
-      idx: 0,
-    };
+    let id = OutputId { node, idx: 0 };
     let dt = DataType::Vec4;
     let name = self.add_local("out", code, dt);
-    let value = CompiledValue {
-      value: name, dt
-    };
+    let value = CompiledValue { value: name, dt };
     self.outputs.insert(id, NodeOutput::Compiled(value));
   }
 
@@ -292,7 +297,13 @@ impl NodeGraphCompile {
     Ok(block.add_local(prefix, code, dt))
   }
 
-  pub fn add_output(&mut self, id: OutputId, prefix: &str, code: String, dt: DataType) -> Result<()> {
+  pub fn add_output(
+    &mut self,
+    id: OutputId,
+    prefix: &str,
+    code: String,
+    dt: DataType,
+  ) -> Result<()> {
     let block = self.current_block()?;
     block.add_output(id, prefix, code, dt);
     Ok(())

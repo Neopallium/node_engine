@@ -392,7 +392,13 @@ pub trait ParameterType {
   fn parameter_data_type() -> ParameterDataType;
 
   #[cfg(feature = "egui")]
-  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
+  fn parameter_ui(
+    &mut self,
+    def: &ParameterDefinition,
+    ui: &mut egui::Ui,
+    _id: NodeId,
+    _details: bool,
+  ) -> bool {
     ui.horizontal(|ui| {
       let mut value = self.get_param();
       ui.label(&def.name);
@@ -433,7 +439,13 @@ where
   }
 
   #[cfg(feature = "egui")]
-  fn parameter_ui(&mut self, def: &ParameterDefinition, ui: &mut egui::Ui, _id: NodeId, _details: bool) -> bool {
+  fn parameter_ui(
+    &mut self,
+    def: &ParameterDefinition,
+    ui: &mut egui::Ui,
+    _id: NodeId,
+    _details: bool,
+  ) -> bool {
     ui.horizontal(|ui| {
       ui.label(&def.name);
       self.ui(ui)
@@ -548,7 +560,9 @@ pub struct OutputTyped<T, const N: u32, const C: u32 = 0> {
 
 impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
   pub fn data_type(&self) -> DataType {
-    self.concrete_type.unwrap_or_else(|| T::default().data_type())
+    self
+      .concrete_type
+      .unwrap_or_else(|| T::default().data_type())
   }
 
   pub fn is_dynamic(&self) -> bool {
@@ -581,7 +595,14 @@ impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
     }
   }
 
-  pub fn compile(&self, compile: &mut NodeGraphCompile, node: NodeId, prefix: &str, code: String, dt: DataType) -> Result<()> {
+  pub fn compile(
+    &self,
+    compile: &mut NodeGraphCompile,
+    node: NodeId,
+    prefix: &str,
+    code: String,
+    dt: DataType,
+  ) -> Result<()> {
     compile.add_output(OutputId::new(node, N), prefix, code, dt)
   }
 }
@@ -589,7 +610,14 @@ impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
 #[cfg(feature = "egui")]
 impl<T: ValueType + Default, const N: u32, const C: u32> OutputTyped<T, N, C> {
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &OutputDefinition, ui: &mut egui::Ui, id: NodeId, details: bool) {
+  pub fn ui(
+    &mut self,
+    concrete_type: &mut NodeConcreteType,
+    def: &OutputDefinition,
+    ui: &mut egui::Ui,
+    id: NodeId,
+    details: bool,
+  ) {
     ui.horizontal(|ui| {
       ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         if self.is_dynamic() && self.update_concrete_type(concrete_type) {

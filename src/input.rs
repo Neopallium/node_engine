@@ -88,7 +88,12 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
     }
   }
 
-  pub fn resolve(&self, concrete_type: &mut NodeConcreteType, graph: &NodeGraph, compile: &mut NodeGraphCompile) -> Result<CompiledValue> {
+  pub fn resolve(
+    &self,
+    concrete_type: &mut NodeConcreteType,
+    graph: &NodeGraph,
+    compile: &mut NodeGraphCompile,
+  ) -> Result<CompiledValue> {
     let mut value = match &self.connected {
       Some((id, _)) => {
         let value = compile.resolve_output(graph, *id)?;
@@ -105,7 +110,11 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
     Ok(value)
   }
 
-  pub fn compile(&self, graph: &NodeGraph, compile: &mut NodeGraphCompile) -> Result<CompiledValue> {
+  pub fn compile(
+    &self,
+    graph: &NodeGraph,
+    compile: &mut NodeGraphCompile,
+  ) -> Result<CompiledValue> {
     let mut value = match &self.connected {
       Some((id, _)) => compile.resolve_output(graph, *id)?,
       None => self.value.compile()?,
@@ -135,7 +144,14 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
   }
 
   #[cfg(feature = "egui")]
-  pub fn ui(&mut self, concrete_type: &mut NodeConcreteType, def: &InputDefinition, ui: &mut egui::Ui, id: NodeId, details: bool) -> bool {
+  pub fn ui(
+    &mut self,
+    concrete_type: &mut NodeConcreteType,
+    def: &InputDefinition,
+    ui: &mut egui::Ui,
+    id: NodeId,
+    details: bool,
+  ) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
       if details {
@@ -157,13 +173,13 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
             }
             ui.add(socket);
             ui.label(&def.name);
-          },
+          }
           None => {
             ui.add(NodeSocket::input(id, N, false, def));
             ui.collapsing(&def.name, |ui| {
               changed = self.value.ui(ui);
             });
-          },
+          }
         }
       }
     });

@@ -56,18 +56,13 @@ impl NodeConcreteType {
         _ => (DataType::Vec2, DataType::Mat2),
       };
       match value.dt.class() {
-        DataTypeClass::Scalar => {
-          value.convert(vec_dt)
-        }
-        DataTypeClass::Vector => {
-          value.convert(vec_dt)
-        },
-        DataTypeClass::Matrix => {
-          value.convert(mat_dt)
-        },
-        class => {
-          Err(anyhow!("Unsupported data type conversion: class={class:?}, dt={:?}", value.dt))
-        }
+        DataTypeClass::Scalar => value.convert(vec_dt),
+        DataTypeClass::Vector => value.convert(vec_dt),
+        DataTypeClass::Matrix => value.convert(mat_dt),
+        class => Err(anyhow!(
+          "Unsupported data type conversion: class={class:?}, dt={:?}",
+          value.dt
+        )),
       }
     } else {
       Ok(())
@@ -115,7 +110,7 @@ impl NodeConcreteType {
           self.min = Some(DynamicSize::D4);
         }
       }
-      _ => ()
+      _ => (),
     }
   }
 }
@@ -158,10 +153,7 @@ impl OutputId {
 
 impl From<NodeId> for OutputId {
   fn from(node: NodeId) -> Self {
-    Self {
-      node,
-      idx: 0,
-    }
+    Self { node, idx: 0 }
   }
 }
 
@@ -281,13 +273,31 @@ pub trait NodeImpl: fmt::Debug + erased_serde::Serialize + Send + Sync {
   }
 
   #[cfg(feature = "egui")]
-  fn inputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId, details: bool) -> bool;
+  fn inputs_ui(
+    &mut self,
+    concrete_type: &mut NodeConcreteType,
+    ui: &mut egui::Ui,
+    id: NodeId,
+    details: bool,
+  ) -> bool;
 
   #[cfg(feature = "egui")]
-  fn parameters_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, _id: NodeId, details: bool) -> bool;
+  fn parameters_ui(
+    &mut self,
+    concrete_type: &mut NodeConcreteType,
+    ui: &mut egui::Ui,
+    _id: NodeId,
+    details: bool,
+  ) -> bool;
 
   #[cfg(feature = "egui")]
-  fn outputs_ui(&mut self, concrete_type: &mut NodeConcreteType, ui: &mut egui::Ui, id: NodeId, details: bool) -> bool;
+  fn outputs_ui(
+    &mut self,
+    concrete_type: &mut NodeConcreteType,
+    ui: &mut egui::Ui,
+    id: NodeId,
+    details: bool,
+  ) -> bool;
 }
 
 impl Serialize for dyn NodeImpl {

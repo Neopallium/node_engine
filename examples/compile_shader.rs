@@ -38,9 +38,7 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
   let position = [max_depth as f32 * X_OFFSET, 0.].into();
   let (size, id) = build_sub_graph(&scalar, &mut graph, position, max_depth)?;
 
-  let mut frag = reg
-    .new_by_name("Fragment")
-    .expect("Fragment output node");
+  let mut frag = reg.new_by_name("Fragment").expect("Fragment output node");
   frag.set_position(position);
   let output_id = graph.add(frag);
   graph.set_node_input(output_id, "Color", Input::from(id))?;

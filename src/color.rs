@@ -58,9 +58,19 @@ pub const fn color_rgb_to_u32(a: [u8; 3]) -> u32 {
 
 #[macro_export]
 macro_rules! const_color {
-  (RED) => { 0xFF0000 };
-  (GREEN) => { 0x00FF00 };
-  (BLUE) => { 0x0000FF };
-  (WHITE) => { 0xFFFFFF };
-  ($c:literal) => { $c };
+  (RED) => {
+    0xFF0000
+  };
+  (GREEN) => {
+    0x00FF00
+  };
+  (BLUE) => {
+    0x0000FF
+  };
+  (WHITE) => {
+    0xFFFFFF
+  };
+  ($c:literal) => {
+    $c
+  };
 }

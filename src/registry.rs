@@ -319,10 +319,11 @@ impl NodeDefinition {
   }
 
   pub fn matches(&self, filter: &NodeFilter) -> bool {
-    !self.deprecated && self
-      .name
-      .to_lowercase()
-      .contains(&filter.name.to_lowercase())
+    !self.deprecated
+      && self
+        .name
+        .to_lowercase()
+        .contains(&filter.name.to_lowercase())
   }
 
   pub fn new_node(&self) -> Result<Box<dyn NodeImpl>> {
