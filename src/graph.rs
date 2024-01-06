@@ -508,6 +508,7 @@ impl NodeGraph {
   }
 
   pub fn details_ui(&mut self, ui: &mut egui::Ui) {
+    let mut updated = false;
     if let Some(id) = self.details_state.selected_node {
       if let Some(node) = self.nodes.0.get_mut(&id) {
         ui.vertical(|ui| {
@@ -515,12 +516,17 @@ impl NodeGraph {
             ui.label("Name:");
             ui.text_edit_singleline(&mut node.name);
           });
-          node.details_ui(ui, id);
+          if node.details_ui(ui, id) {
+            updated = true;
+          }
         });
       }
     } else {
       // Show tips.
       ui.label("Click node to view/edit details");
+    }
+    if updated {
+      self.updated();
     }
   }
 
