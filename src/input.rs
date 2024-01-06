@@ -139,14 +139,18 @@ impl<T: ValueType, const N: u32> InputTyped<T, N> {
     let mut changed = false;
     ui.horizontal(|ui| {
       match self.connected {
-        Some((output_id, _)) => {
+        Some((output_id, mut dt)) => {
           if self.is_dynamic() {
-            let dt = NodeGraphMeta::get(ui).and_then(|g| g.resolve_output(&output_id));
+            dt = NodeGraphMeta::get(ui).and_then(|g| g.resolve_output(&output_id));
             if let Some(dt) = dt {
               concrete_type.add_input_type(dt);
             }
           }
-          ui.add(NodeSocket::input(id, N, true, def));
+          let mut socket = NodeSocket::input(id, N, true, def);
+          if let Some(dt) = dt {
+            socket.set_data_type(dt);
+          }
+          ui.add(socket);
           ui.label(&def.name);
         },
         None => {

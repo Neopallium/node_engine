@@ -22,6 +22,9 @@ const NODE_GRAPH_META: &'static str = "NodeGraphMeta";
 pub struct NodeStyle {
   pub node_min_size: emath::Vec2,
   pub line_stroke: egui::Stroke,
+  pub input_to_edge: f32,
+  pub output_to_edge: f32,
+  pub curve_offset: f32,
   pub zoom: f32,
 }
 
@@ -29,7 +32,10 @@ impl Default for NodeStyle {
   fn default() -> Self {
     Self {
       node_min_size: (200.0, 10.0).into(),
-      line_stroke: (3.0, egui::Color32::WHITE).into(),
+      line_stroke: (2.0, egui::Color32::WHITE).into(),
+      input_to_edge: -13.0,
+      output_to_edge: 17.0,
+      curve_offset: 10.0,
       zoom: 1.0,
     }
   }
@@ -39,6 +45,9 @@ impl Zoom for NodeStyle {
   #[inline(always)]
   fn zoom(&mut self, zoom: f32) {
     self.zoom *= zoom;
+    self.curve_offset *= zoom;
+    self.input_to_edge *= zoom;
+    self.output_to_edge *= zoom;
     self.node_min_size.zoom(zoom);
     self.line_stroke.zoom(zoom);
   }
@@ -66,6 +75,88 @@ impl NodeStyle {
       node_style.zoom(zoom);
       node_style.clone()
     })
+  }
+}
+
+#[derive(Clone, Debug)]
+pub struct NodeConnection {
+  pub ui_min: emath::Vec2,
+  pub zoom: f32,
+  pub line_stroke: egui::Stroke,
+  pub curve_offset: f32,
+}
+
+impl NodeConnection {
+  pub fn new(style: &NodeStyle, ui_min: emath::Vec2) -> Self {
+    Self {
+      ui_min,
+      zoom: style.zoom,
+      line_stroke: style.line_stroke,
+      curve_offset: style.curve_offset,
+    }
+  }
+
+  /// Convert a point from Graph-space to UI-space.
+  pub fn to_ui_pos(&self, pos: emath::Vec2) -> emath::Pos2 {
+    (pos * self.zoom).to_pos2() + self.ui_min
+  }
+
+  pub fn draw(&self, ui: &mut egui::Ui, start: emath::Pos2, end: emath::Pos2, color: Option<ecolor::Color32>, highlight: bool) -> Option<emath::Rect> {
+    let mut offset = (start - end) * 0.2;
+    offset.x = self.curve_offset + offset.y.abs() + offset.x.abs();
+    let start2 = start - offset;
+    let end2 = end + offset;
+    let mut shape = egui::epaint::CubicBezierShape {
+      points: [start, start2, end2, end],
+      closed: false,
+      fill: ecolor::Color32::TRANSPARENT,
+      stroke: self.line_stroke,
+    };
+    let rect = shape.visual_bounding_rect();
+    if let Some(color) = color {
+      shape.stroke.color = color;
+    }
+    // Check if the mouse pointer is close to the connection.
+    let mut hover = false;
+    let resp_rect = if highlight {
+      let margin = 10.0 * self.zoom;
+      let rect = rect.expand(margin);
+      match ui.ctx().pointer_latest_pos() {
+        Some(pointer) if rect.contains(pointer) => {
+
+          let tolerance = (start.x - end.x).abs() * 0.001;
+          let mut last = start;
+          shape.for_each_flattened_with_t(tolerance, &mut |pos, _t| {
+            // Make bounding box for each line segment.
+            let rect = emath::Rect::from_two_pos(last, pos).expand(margin);
+            if rect.contains(pointer) {
+              hover = true;
+            }
+            last = pos;
+          });
+
+          if hover {
+            shape.stroke.width *= 1.8;
+            Some(rect)
+          } else {
+            None
+          }
+        }
+        _ => None,
+      }
+    } else {
+      None
+    };
+    // Check if part of the connection is visible.
+    let id = ui.next_auto_id();
+    if ui.is_rect_visible(rect) {
+      let mut painter = ui.painter().clone();
+      if hover {
+        painter = painter.with_layer_id(egui::layers::LayerId::new(egui::layers::Order::Foreground, id));
+      }
+      painter.add(shape);
+    }
+    resp_rect
   }
 }
 
@@ -181,6 +272,15 @@ impl NodeGraphMetaInner {
       .collect()
   }
 
+  pub fn has_selected(&self) -> bool {
+    for frame in self.frames.values() {
+      if frame.selected {
+        return true;
+      }
+    }
+    false
+  }
+
   pub fn frame_state(&self, id: Uuid) -> NodeFrameState {
     self.frames.get(&id).cloned().unwrap_or_default()
   }
@@ -276,6 +376,11 @@ impl NodeGraphMeta {
 
   pub fn clear_selected(&self) {
     self.take_selected();
+  }
+
+  pub fn has_selected(&self) -> bool {
+    let inner = self.0.read().unwrap();
+    inner.has_selected()
   }
 
   pub fn frame_state(&self, id: Uuid) -> NodeFrameState {
@@ -408,6 +513,11 @@ impl NodeSocket {
     }
   }
 
+  pub fn set_data_type(&mut self, dt: DataType) {
+    self.dt = dt;
+    self.color = dt.color();
+  }
+
   pub fn is_compatible(&self, dst: &NodeSocket) -> bool {
     self.id.is_compatible(dst.id) && self.dt.is_compatible(&dst.dt)
   }
@@ -439,6 +549,7 @@ impl NodeSocket {
 
 impl egui::Widget for NodeSocket {
   fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
+    let node_style = NodeStyle::get(ui);
     // 1. Deciding widget size:
     let spacing = &ui.spacing();
     let icon_width = spacing.icon_width;
@@ -457,8 +568,17 @@ impl egui::Widget for NodeSocket {
         return ui.label("NodeSocket not inside a NodeGraph");
       }
     };
+
+    // Calculate connecting point (at the edge of the node's frame).
+    let (to_edge, dir) = if self.id.is_input() {
+      (node_style.input_to_edge, -1.0)
+    } else {
+      (node_style.output_to_edge, 1.0)
+    };
+    let end = center + emath::Vec2::from((to_edge, 0.));
+
     // Update socket metadata.
-    graph.update_node_socket(&mut self, center);
+    graph.update_node_socket(&mut self, end);
 
     // Get current socket drag state.
     let mut drag_state = graph.drag_state();
@@ -488,31 +608,40 @@ impl egui::Widget for NodeSocket {
     graph.set_drag_state(drag_state);
     let selected = hovered || self.connected;
 
-    // We will follow the current style by asking
-    // "how should something that is being interacted with be painted?".
-    // This will, for instance, give us different colors when the widget is hovered or clicked.
-    let style = ui.style();
-    let visuals = style.interact_selectable(&response, selected);
-    let mut bg_stroke = visuals.bg_stroke;
-    bg_stroke.color = self.color;
-    if hovered {
-      bg_stroke = bg_stroke;
-    }
-
     // Attach some meta-data to the response which can be used by screen readers:
     response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, selected, ""));
 
     // 4. Paint!
     // Make sure we need to paint:
     if ui.is_rect_visible(rect) {
+      // We will follow the current style by asking
+      // "how should something that is being interacted with be painted?".
+      // This will, for instance, give us different colors when the widget is hovered or clicked.
+      let style = ui.style();
+      let visuals = style.interact_selectable(&response, selected);
+      let mut bg_stroke = visuals.bg_stroke;
+      let mut line_stroke = node_style.line_stroke;
+      bg_stroke.color = self.color;
+      line_stroke.color = self.color;
+      if hovered {
+        bg_stroke.width *= 1.5;
+        line_stroke.width *= 1.5;
+      }
+
       let scale = 0.7;
       let big_radius = (big_icon_rect.width() / 2.0 + visuals.expansion) * scale;
       let small_radius = (small_icon_rect.width() / 2.0) * scale;
 
       let painter = ui.painter();
 
+      // Main socket circle.
       painter.circle(center, big_radius, visuals.bg_fill, bg_stroke);
+      // Draw line from socket to edge of the frame.
+      let start_offset = emath::Vec2::from((big_radius, 0.)) * dir;
+      let start = center + start_offset;
+      painter.line_segment([start, end], line_stroke);
 
+      // Fill the socket circle if selected or connected.
       if selected {
         painter.circle_filled(center, small_radius, self.color);
       }

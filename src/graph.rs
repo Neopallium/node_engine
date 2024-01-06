@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::path::Path;
+
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
@@ -224,6 +227,11 @@ impl NodeFinder {
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
+struct MenuState {
+  hover_connection: Option<InputId>,
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
   id: Uuid,
   editor: EditorState,
@@ -234,6 +242,10 @@ pub struct NodeGraph {
   output: Option<NodeId>,
   #[serde(skip)]
   changed: usize,
+  #[serde(skip)]
+  hover_connection: Option<InputId>,
+  #[serde(skip)]
+  menu_state: Option<MenuState>,
   #[serde(skip)]
   #[cfg(feature = "egui")]
   ui_state: NodeGraphMeta,
@@ -438,6 +450,16 @@ impl NodeGraph {
 
 #[cfg(feature = "egui")]
 impl NodeGraph {
+  /// Returns true if there are selected nodes.
+  pub fn has_selected(&self) -> bool {
+    self.ui_state.has_selected()
+  }
+
+  /// Is the pointer hover a connection.
+  pub fn hover_connection(&self) -> Option<InputId> {
+    self.hover_connection
+  }
+
   pub fn open_node_finder(&mut self, ui: &egui::Ui) {
     if let Some(pos) = ui.ctx().pointer_latest_pos() {
       self.editor.add_node_at = self.editor.graph_pointer_pos;
@@ -471,7 +493,7 @@ impl NodeGraph {
     });
   }
 
-  pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<egui::Response> {
+  pub fn ui(&mut self, ui: &mut egui::Ui) {
     // Show the node finder if it is open.
     if let Some(node) = self.node_finder.ui(ui) {
       self.add(node);
@@ -609,6 +631,10 @@ impl NodeGraph {
         self.remove_group(group_id, remove_nodes);
       }
 
+      // Draw connections.
+      let connection_style = NodeConnection::new(&node_style, ui_min);
+      self.render_connections(ui, id, &state, connection_style);
+
       // Render nodes.
       let mut remove_node = None;
       let mut updated = false;
@@ -654,75 +680,8 @@ impl NodeGraph {
         self.resize_group(group_id);
       }
 
-      // Check if a connection is being dragged.
-      state.drag_state_mut(|drag| {
-        // Handle connecting/disconnecting.
-        if ui.memory(|m| m.is_being_dragged(id)) && ui.input(|i| i.pointer.any_released()) {
-          ui.memory_mut(|m| m.stop_dragging());
-          // The connection was dropped, take the sockets and check that they are compatible.
-          if let Some((src, dst)) = drag.take_sockets() {
-            if let Some((dst, dt)) = dst {
-              // Connect.
-              if let Err(err) = self.connect(src, dst, dt) {
-                log::warn!("Failed to connect input[{src:?}] to output[{dst:?}]: {err:?}");
-              }
-            } else {
-              // Disconnect
-              if let Err(err) = self.disconnect(src) {
-                log::warn!("Failed to disconnect input[{src:?}]: {err:?}");
-              }
-            }
-          }
-        } else if let Some(src) = &drag.src {
-          ui.memory_mut(|m| m.set_dragged_id(id));
-          // Still dragging a connection.
-          if drag.dst.is_some() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
-          } else {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
-          }
-          // If the dragged socket is an input, then remove it's current connection.
-          if let Some(src) = src.id.as_input_id() {
-            if let Err(err) = self.disconnect(src) {
-              log::warn!("Failed to disconnect input[{src:?}]: {err:?}");
-            }
-          }
-          if let Some(end) = ui.ctx().pointer_latest_pos() {
-            // Try to scroll with the mouse pointer during the drag.
-            if let Some(last) = drag.pointer_last_pos {
-              let delta = (last - end) * 2.0;
-              ui.scroll_with_delta(delta);
-            }
-            drag.pointer_last_pos = Some(end);
-            let center = (src.center * zoom).to_pos2() + ui_min;
-            let mut stroke = node_style.line_stroke;
-            stroke.color = src.color;
-            ui.painter().line_segment([center, end], stroke);
-          }
-        }
-      });
-
       // Unload the graph state from egui.
       state.unload(ui);
-
-      // Draw connections.
-      let painter = ui.painter();
-      for (input, output) in &self.connections.0 {
-        let meta = state.get_connection_meta(input, output);
-        if let Some((in_meta, out_meta)) = meta {
-          // Convert the sockets back to screen-space
-          // and apply zoom.
-          let in_pos = (in_meta.center * zoom).to_pos2() + ui_min;
-          let out_pos = (out_meta.center * zoom).to_pos2() + ui_min;
-          let rect = egui::Rect::from_points(&[in_pos, out_pos]);
-          // Check if part of the connection is visible.
-          if ui.is_rect_visible(rect) {
-            let mut stroke = node_style.line_stroke;
-            stroke.color = out_meta.color;
-            painter.line_segment([in_pos, out_pos], stroke);
-          }
-        }
-      }
 
       if let Some(selecting) = select_state {
         selecting.ui(ui);
@@ -736,7 +695,106 @@ impl NodeGraph {
     // Save scroll offset and de-zoom it.
     self.editor.scroll_offset = out.state.offset / zoom;
 
-    out.inner
+    if let Some(resp) = out.inner {
+      resp.context_menu(|ui| self.context_menu(ui));
+      if !ui.ctx().is_context_menu_open() {
+        self.menu_state = None;
+      }
+    }
+  }
+
+  fn context_menu(&mut self, ui: &mut egui::Ui) {
+    let state = self.menu_state.get_or_insert_with(|| {
+      MenuState {
+        hover_connection: self.hover_connection,
+      }
+    }).clone();
+    if ui.button("Create node").clicked() {
+      self.open_node_finder(ui);
+      ui.close_menu();
+    }
+    if self.has_selected() && ui.button("Group Nodes").clicked() {
+      self.group_selected_nodes();
+      ui.close_menu();
+    }
+    if let Some(input) = state.hover_connection {
+      if ui.button("Delete connection").clicked() {
+        if let Err(err) = self.disconnect(input) {
+          log::error!("Failed to delete connection: {err:?}");
+        }
+        ui.close_menu();
+      }
+    }
+  }
+
+  fn render_connections(&mut self, ui: &mut egui::Ui, id: egui::Id, state: &NodeGraphMeta, conn: NodeConnection) {
+    //let zoom = style.zoom;
+    // Check if a connection is being dragged.
+    state.drag_state_mut(|drag| {
+      // Handle connecting/disconnecting.
+      if ui.memory(|m| m.is_being_dragged(id)) && ui.input(|i| i.pointer.any_released()) {
+        ui.memory_mut(|m| m.stop_dragging());
+        // The connection was dropped, take the sockets and check that they are compatible.
+        if let Some((src, dst)) = drag.take_sockets() {
+          if let Some((dst, dt)) = dst {
+            // Connect.
+            if let Err(err) = self.connect(src, dst, dt) {
+              log::warn!("Failed to connect input[{src:?}] to output[{dst:?}]: {err:?}");
+            }
+          } else {
+            // Disconnect
+            if let Err(err) = self.disconnect(src) {
+              log::warn!("Failed to disconnect input[{src:?}]: {err:?}");
+            }
+          }
+        }
+      } else if let Some(src) = &drag.src {
+        ui.memory_mut(|m| m.set_dragged_id(id));
+        // Still dragging a connection.
+        let dst = if let Some(dst) = &drag.dst {
+          // Hovering over the destination socket.
+          ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+          Some((conn.to_ui_pos(dst.center), dst.color))
+        } else if let Some(end) = ui.ctx().pointer_latest_pos() {
+          ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+          // Try to scroll with the mouse pointer during the drag.
+          if let Some(last) = drag.pointer_last_pos {
+            let delta = (last - end) * 2.0;
+            ui.scroll_with_delta(delta);
+          }
+          drag.pointer_last_pos = Some(end);
+          Some((end, src.color))
+        } else {
+          None
+        };
+        if let Some((dst, color)) = dst {
+          let (start, end, color) = if let Some(input_id) = src.id.as_input_id() {
+            // If the dragged socket is an input, then remove it's current connection.
+            if let Err(err) = self.disconnect(input_id) {
+              log::warn!("Failed to disconnect input[{input_id:?}]: {err:?}");
+            }
+            (conn.to_ui_pos(src.center), dst, color)
+          } else {
+            // The dragged socket is an output.
+            (dst, conn.to_ui_pos(src.center), color)
+          };
+          conn.draw(ui, start, end, Some(color), false);
+        }
+      }
+    });
+
+    // Draw connections.
+    self.hover_connection = None;
+    for (input, output) in &self.connections.0 {
+      let meta = state.get_connection_meta(input, output);
+      if let Some((in_meta, out_meta)) = meta {
+        let start = conn.to_ui_pos(in_meta.center);
+        let end = conn.to_ui_pos(out_meta.center);
+        if conn.draw(ui, start, end, Some(out_meta.color), true).is_some() {
+          self.hover_connection = Some(*input);
+        }
+      }
+    }
   }
 }
 
@@ -765,6 +823,13 @@ impl NodeGraphEditor {
     Self::default()
   }
 
+  pub fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    let path = path.as_ref();
+    let file = File::open(path)?;
+    self.graph = serde_json::from_reader(file)?;
+    Ok(())
+  }
+
   pub fn show(&mut self, ctx: &egui::Context) {
     egui::Window::new(&self.title)
       .default_size(self.size)
@@ -776,20 +841,7 @@ impl NodeGraphEditor {
           .show_separator_line(false)
           .show_inside(ui, |_ui| {});
 
-        let out = egui::CentralPanel::default().show_inside(ui, |ui| self.graph.ui(ui));
-        if let Some(resp) = out.inner {
-          // Graph menu.
-          resp.context_menu(|ui| {
-            if ui.button("Create node").clicked() {
-              self.graph.open_node_finder(ui);
-              ui.close_menu();
-            }
-            if ui.button("Group Nodes").clicked() {
-              self.graph.group_selected_nodes();
-              ui.close_menu();
-            }
-          });
-        }
+        egui::CentralPanel::default().show_inside(ui, |ui| self.graph.ui(ui));
       });
   }
 }

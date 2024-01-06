@@ -3,6 +3,7 @@ use glam::Vec4;
 use node_engine::*;
 
 fn main() {
+  let file = std::env::args().nth(1);
   env_logger::init();
   let native_options = eframe::NativeOptions {
     viewport: egui::ViewportBuilder::default().with_inner_size([1000.0, 600.0]),
@@ -11,7 +12,7 @@ fn main() {
   eframe::run_native(
     "My egui App",
     native_options,
-    Box::new(|cc| Box::new(MyEguiApp::new(cc))),
+    Box::new(|cc| Box::new(MyEguiApp::new(file, cc))),
   )
   .expect("ok");
 }
@@ -68,21 +69,22 @@ fn build_graph(reg: &NodeRegistry, max_depth: usize) -> anyhow::Result<(usize, N
 #[derive(Default)]
 struct MyEguiApp {
   editor: NodeGraphEditor,
-  editor2: NodeGraphEditor,
 }
 
 impl MyEguiApp {
-  fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+  fn new(file: Option<String>, _cc: &eframe::CreationContext<'_>) -> Self {
     let reg = NodeRegistry::build();
     eprintln!("Build shader graph");
-    let (_size, graph) = build_graph(&reg, 2).expect("built graph");
     let mut editor = NodeGraphEditor::new();
-    editor.graph = graph;
-    let (_size, graph) = build_graph(&reg, 2).expect("built graph");
-    let mut editor2 = NodeGraphEditor::new();
-    editor2.graph = graph;
-    editor2.title = "Graph 2".to_string();
-    Self { editor, editor2 }
+    if let Some(file) = file {
+      if let Err(err) = editor.load(file) {
+        eprintln!("Failed to load graph: {err:?}");
+      }
+    } else {
+      let (_size, graph) = build_graph(&reg, 2).expect("built graph");
+      editor.graph = graph;
+    }
+    Self { editor }
   }
 }
 
@@ -107,6 +109,5 @@ impl eframe::App for MyEguiApp {
       ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
     self.editor.show(ctx);
-    self.editor2.show(ctx);
   }
 }
