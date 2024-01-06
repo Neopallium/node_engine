@@ -467,7 +467,9 @@ impl NodeFrame for Node {
     frame: &mut NodeFrameState,
   ) -> Option<NodeAction> {
     let mut action = None;
-    if resp.dragged() {
+    if resp.clicked() {
+      action = Some(NodeAction::Clicked);
+    } else if resp.dragged() {
       if frame.is_dragging() {
         action = Some(NodeAction::Dragged(resp.drag_delta()));
       } else {

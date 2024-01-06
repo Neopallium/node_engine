@@ -232,6 +232,11 @@ struct MenuState {
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
+struct DetailPanelState {
+  pub selected_node: Option<NodeId>,
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
   id: Uuid,
   editor: EditorState,
@@ -246,6 +251,8 @@ pub struct NodeGraph {
   hover_connection: Option<InputId>,
   #[serde(skip)]
   menu_state: Option<MenuState>,
+  #[serde(skip)]
+  details_state: DetailPanelState,
   #[serde(skip)]
   #[cfg(feature = "egui")]
   ui_state: NodeGraphMeta,
@@ -493,7 +500,47 @@ impl NodeGraph {
     });
   }
 
-  pub fn ui(&mut self, ui: &mut egui::Ui) {
+  pub fn show(&mut self, ui: &mut egui::Ui) {
+    self.show_right(ui);
+    self.show_center(ui);
+  }
+
+  pub fn show_right(&mut self, ui: &mut egui::Ui) {
+    // Note: Without this side panel, the central panel will not work with a ScrollArea.
+    egui::SidePanel::right("graph_right_panel")
+      .min_width(150.0)
+      .resizable(false)
+      .show_inside(ui, |ui| self.ui_right(ui));
+  }
+
+  pub fn ui_right(&mut self, ui: &mut egui::Ui) {
+    if let Some(id) = self.details_state.selected_node {
+      if let Some(node) = self.nodes.0.get_mut(&id) {
+        ui.vertical(|ui| {
+          ui.horizontal(|ui| {
+            ui.label("Name:");
+            ui.text_edit_singleline(&mut node.name);
+          });
+        });
+      }
+    } else {
+      // Show tips.
+      ui.label("Click node to view/edit details");
+    }
+  }
+
+  pub fn show_center(&mut self, ui: &mut egui::Ui) {
+    egui::CentralPanel::default().show_inside(ui, |ui| self.ui_center(ui));
+  }
+
+  fn handle_clicked(&mut self, clear_on_click: bool) {
+    if clear_on_click {
+      self.details_state.selected_node = None;
+      self.ui_state.clear_selected();
+    }
+  }
+
+  pub fn ui_center(&mut self, ui: &mut egui::Ui) {
     // Show the node finder if it is open.
     if let Some(node) = self.node_finder.ui(ui) {
       self.add(node);
@@ -585,6 +632,9 @@ impl NodeGraph {
       if selecting {
         let rect = ui.available_rect_before_wrap();
         let resp = ui.interact(rect, id, egui::Sense::click_and_drag());
+        if resp.clicked() {
+          self.handle_clicked(clear_selected);
+        }
         state.selecting_mut(|selecting| {
           if resp.drag_started() {
             selecting.drag_started(pointer_pos, clear_selected);
@@ -603,6 +653,7 @@ impl NodeGraph {
       // Render groups.
       let mut remove_group = None;
       let mut resize_groups = BTreeSet::new();
+      let mut clicked_group = None;
       for (group_id, group) in &mut self.groups.0 {
         match state.render(ui, group) {
           Some(NodeAction::Dragged(delta)) => {
@@ -612,6 +663,9 @@ impl NodeGraph {
                 node.handle_move(delta);
               }
             }
+          }
+          Some(NodeAction::Clicked) => {
+            clicked_group = Some(*group_id);
           }
           Some(NodeAction::Delete(nodes)) => {
             remove_group = Some((*group_id, nodes));
@@ -627,6 +681,10 @@ impl NodeGraph {
           _ => (),
         }
       }
+      if let Some(group_id) = clicked_group {
+        self.handle_clicked(clear_selected);
+        self.select_node(group_id, true);
+      }
       if let Some((group_id, remove_nodes)) = remove_group {
         self.remove_group(group_id, remove_nodes);
       }
@@ -638,12 +696,16 @@ impl NodeGraph {
       // Render nodes.
       let mut remove_node = None;
       let mut updated = false;
+      let mut clicked_node = None;
       for (node_id, node) in &mut self.nodes.0 {
         match state.render(ui, node) {
           Some(NodeAction::Dragged(_) | NodeAction::Resize) => {
             if !node.group_id.is_nil() {
               resize_groups.insert(node.group_id);
             }
+          }
+          Some(NodeAction::Clicked) => {
+            clicked_node = Some(*node_id);
           }
           Some(NodeAction::Delete(_)) => {
             remove_node = Some(*node_id);
@@ -654,6 +716,11 @@ impl NodeGraph {
           _ => (),
         }
         updated |= node.updated;
+      }
+      if let Some(node_id) = clicked_node {
+        self.handle_clicked(clear_selected);
+        self.details_state.selected_node = Some(node_id);
+        self.select_node(node_id, true);
       }
 
       // Check for outputs that have changed their data types.
@@ -833,15 +900,6 @@ impl NodeGraphEditor {
   pub fn show(&mut self, ctx: &egui::Context) {
     egui::Window::new(&self.title)
       .default_size(self.size)
-      .show(ctx, |ui| {
-        // HACK: Without this side panel, the central panel will not work with a ScrollArea.
-        egui::SidePanel::right("graph_right_panel")
-          .min_width(0.)
-          .frame(egui::Frame::none())
-          .show_separator_line(false)
-          .show_inside(ui, |_ui| {});
-
-        egui::CentralPanel::default().show_inside(ui, |ui| self.graph.ui(ui));
-      });
+      .show(ctx, |ui| self.graph.show(ui));
   }
 }

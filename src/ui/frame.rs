@@ -21,6 +21,8 @@ impl Default for NodeFrameStyle {
 pub enum NodeAction {
   Dragged(emath::Vec2),
   Resize,
+  /// Clicked.
+  Clicked,
   /// false - Only delete the node, true - Also delete contained nodes (for groups).
   Delete(bool),
   /// Remove a node from a group.
@@ -187,7 +189,9 @@ pub trait NodeFrame: GetId {
     frame: &mut NodeFrameState,
   ) -> Option<NodeAction> {
     let mut action = None;
-    if resp.dragged() {
+    if resp.clicked() {
+      action = Some(NodeAction::Clicked);
+    } else if resp.dragged() {
       if frame.is_dragging() {
         action = Some(NodeAction::Dragged(resp.drag_delta()));
       } else {
