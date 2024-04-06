@@ -225,7 +225,7 @@ struct ShaderGraphMaterialUniform {
   prop_vec4: vec4<f32>,
 };
 
-@group(1) @binding(100) var<uniform> material: ShaderGraphMaterialUniform;
+@group(2) @binding(100) var<uniform> material: ShaderGraphMaterialUniform;
 "#
           .to_string(),
         )?;

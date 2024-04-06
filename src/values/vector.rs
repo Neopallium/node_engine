@@ -42,7 +42,8 @@ pub(crate) fn f32_table_ui(
         }
       })
       .body(|body| {
-        body.rows(height, rows, |row_index, mut row| {
+        body.rows(height, rows, |mut row| {
+          let row_index = row.index();
           for col in 0..columns.len() {
             row.col(|ui| {
               let val = &mut values[col * rows + row_index];

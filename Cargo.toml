@@ -1,6 +1,6 @@
 [package]
 name = "node_engine"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Robert G. Jakabosky <rjakabosky+neopallium@neoawareness.com>"]
 license = "MIT/Apache-2.0"
@@ -26,10 +26,10 @@ env_logger = "0.10"
 lazy_static = "1.4.0"
 thiserror = "1.0"
 
-emath = { version = "0.24", default-features = false, features = ["serde"] }
-ecolor = { version = "0.24", default-features = false, features = ["serde"] }
-egui = { version = "0.24", optional = true, default-features = false }
-egui_extras = { version = "0.24", optional = true, default-features = false }
+emath = { version = "0.26", default-features = false, features = ["serde"] }
+ecolor = { version = "0.26", default-features = false, features = ["serde"] }
+egui = { version = "0.26", optional = true, default-features = false }
+egui_extras = { version = "0.26", optional = true, default-features = false }
 hex = "0.4"
 
 serde = { version = "1", features = ["derive", "rc"] }
@@ -38,15 +38,15 @@ inventory = { version = "0.3" }
 erased-serde = "0.3"
 heck = "0.4"
 
-glam = { version = "0.24", features = ["serde"] }
+glam = { version = "0.25", features = ["serde"] }
 indexmap = { version = "2.0", features = ["serde"] }
 uuid = { version = "1.4", features = ["v4", "v5", "serde"] }
 
-bevy = { version = "0.12", optional = true, default-features = false, features = ["bevy_asset", "bevy_render", "bevy_pbr"] }
+bevy = { version = "0.13", optional = true, default-features = false, features = ["bevy_asset", "bevy_render", "bevy_pbr"] }
 
 [dev-dependencies]
 criterion = "0.5"
-eframe = { version = "0.24", features = ["persistence"] }
+eframe = { version = "0.26", features = ["persistence"] }
 
 [[bench]]
 name = "node_graph"

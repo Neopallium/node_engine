@@ -577,7 +577,7 @@ impl NodeGraph {
       // Multitouch (pinch gesture) zoom.
       let z_delta = ui.input(|i| {
         // Use up/down mouse wheel for zoom.
-        let scroll_delta = i.scroll_delta.y;
+        let scroll_delta = i.raw_scroll_delta.y;
         if scroll_delta > 0.1 {
           0.01
         } else if scroll_delta < -0.1 {
