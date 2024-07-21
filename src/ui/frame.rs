@@ -226,7 +226,7 @@ pub trait NodeFrame: GetId {
     rect = graph.node_to_ui(rect);
 
     // Use child UI for frame.
-    let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.id());
+    let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.id(), None);
     let ui = &mut child_ui;
 
     // Allocate a response for the whole frame area.
@@ -262,7 +262,7 @@ pub trait NodeFrame: GetId {
         }
         None => (),
       }
-    } else if resp.drag_released() {
+    } else if resp.drag_stopped() {
       state.drag = None;
     } else {
       // Get pointer.

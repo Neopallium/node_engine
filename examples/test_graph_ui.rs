@@ -12,7 +12,7 @@ fn main() {
   eframe::run_native(
     "My egui App",
     native_options,
-    Box::new(|cc| Box::new(MyEguiApp::new(file, cc))),
+    Box::new(|cc| Ok(Box::new(MyEguiApp::new(file, cc)))),
   )
   .expect("ok");
 }

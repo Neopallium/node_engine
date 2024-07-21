@@ -1,7 +1,7 @@
 // From: https://github.com/zakarumych/egui-snarl/blob/main/src/ui/zoom.rs
 use egui::{
   epaint::Shadow,
-  style::{Interaction, Spacing, WidgetVisuals, Widgets},
+  style::{Interaction, Spacing, WidgetVisuals, Widgets, TextCursorStyle},
   FontId, Margin, Rounding, Stroke, Style, Visuals,
 };
 
@@ -62,7 +62,16 @@ impl Zoom for Margin {
 impl Zoom for Shadow {
   #[inline(always)]
   fn zoom(&mut self, zoom: f32) {
-    self.extrusion.zoom(zoom);
+    self.offset.zoom(zoom);
+    self.blur.zoom(zoom);
+    self.spread.zoom(zoom);
+  }
+}
+
+impl Zoom for TextCursorStyle {
+  #[inline(always)]
+  fn zoom(&mut self, zoom: f32) {
+    self.stroke.zoom(zoom);
   }
 }
 

@@ -48,7 +48,7 @@ pub(crate) fn f32_table_ui(
             row.col(|ui| {
               let val = &mut values[col * rows + row_index];
               let drag = if let Some((min, max)) = range {
-                egui::DragValue::new(val).speed(0.1).clamp_range(min..=max)
+                egui::DragValue::new(val).speed(0.1).range(min..=max)
               } else {
                 egui::DragValue::new(val).speed(0.1)
               };

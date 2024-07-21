@@ -186,7 +186,7 @@ impl NodeFinder {
       return None;
     }
 
-    let mut area = egui::Area::new("NodeFinder");
+    let mut area = egui::Area::new("NodeFinder".into());
     if let Some(pos) = self.open_at.take() {
       area = area.current_pos(pos);
     }
@@ -273,7 +273,7 @@ impl NodeGraph {
   }
 
   pub fn remove_group(&mut self, group_id: NodeGroupId, delete_nodes: bool) {
-    self.groups.0.remove(&group_id);
+    self.groups.0.shift_remove(&group_id);
     if delete_nodes {
       let mut nodes = Vec::new();
       for (node_id, node) in &mut self.nodes.0 {
@@ -356,7 +356,7 @@ impl NodeGraph {
       self.ui_state.remove_node(id);
     }
     // Remove node.
-    self.nodes.0.remove(&id)
+    self.nodes.0.shift_remove(&id)
   }
 
   pub fn contains(&self, id: NodeId) -> bool {
@@ -391,7 +391,7 @@ impl NodeGraph {
     // Update connections.
     match &value {
       Input::Disconnect => {
-        if self.connections.0.remove(&input_id).is_none() {
+        if self.connections.0.shift_remove(&input_id).is_none() {
           // The input was already disconnected.  No change.
           return Ok(None);
         }
@@ -641,7 +641,7 @@ impl NodeGraph {
             selecting.drag_started(pointer_pos, clear_selected);
             // Close the NodeFinder on clicks.
             self.node_finder.close();
-          } else if resp.drag_released() {
+          } else if resp.drag_stopped() {
             selecting.drag_released();
           } else {
             selecting.update(pointer_pos);
@@ -807,8 +807,8 @@ impl NodeGraph {
     // Check if a connection is being dragged.
     state.drag_state_mut(|drag| {
       // Handle connecting/disconnecting.
-      if ui.memory(|m| m.is_being_dragged(id)) && ui.input(|i| i.pointer.any_released()) {
-        ui.memory_mut(|m| m.stop_dragging());
+      if ui.ctx().drag_stopped_id() == Some(id) {
+        ui.ctx().stop_dragging();
         // The connection was dropped, take the sockets and check that they are compatible.
         if let Some((src, dst)) = drag.take_sockets() {
           if let Some((dst, dt)) = dst {
@@ -824,7 +824,7 @@ impl NodeGraph {
           }
         }
       } else if let Some(src) = &drag.src {
-        ui.memory_mut(|m| m.set_dragged_id(id));
+        ui.ctx().set_dragged_id(id);
         // Still dragging a connection.
         let dst = if let Some(dst) = &drag.dst {
           // Hovering over the destination socket.
