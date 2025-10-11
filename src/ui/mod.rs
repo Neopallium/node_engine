@@ -214,8 +214,12 @@ impl NodeSelectingState {
 
   pub fn ui(&self, ui: &egui::Ui) {
     if let Self::Selecting { area, .. } = self {
-      ui.painter()
-        .rect_stroke(*area, 0.0, (0.5, egui::Color32::LIGHT_GRAY));
+      ui.painter().rect_stroke(
+        *area,
+        0.0,
+        (0.5, egui::Color32::LIGHT_GRAY),
+        egui::StrokeKind::Inside,
+      );
     }
   }
 }
@@ -615,7 +619,8 @@ impl egui::Widget for NodeSocket {
     let selected = hovered || self.connected;
 
     // Attach some meta-data to the response which can be used by screen readers:
-    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, selected, ""));
+    response
+      .widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, selected, ""));
 
     // 4. Paint!
     // Make sure we need to paint:

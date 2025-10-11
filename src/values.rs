@@ -6,7 +6,7 @@ use indexmap::IndexSet;
 
 use glam::{Mat2, Mat3, Mat4, Vec2, Vec3, Vec4};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 #[cfg(feature = "egui")]
 use crate::ui::*;
@@ -528,7 +528,7 @@ impl ParameterDefinition {
       (ParameterDataType::Value(_), ParameterValue::Value(value)) => value.ui(ui),
       (ParameterDataType::Select(values), ParameterValue::Selected(selected)) => {
         let mut changed = false;
-        egui::ComboBox::from_id_source(&self.field_name)
+        egui::ComboBox::from_id_salt(&self.field_name)
           .selected_text(selected.as_str())
           .show_ui(ui, |ui| {
             for value in values {
@@ -640,8 +640,8 @@ mod test {
 
   #[derive(Clone, Debug, Default)]
   pub struct TestOutput {
-    pub out0: OutputTyped<f32, { 0 + 0 }, 0>,
-    pub out1: OutputTyped<f32, { 0 + 1 }, 0>,
+    pub _out0: OutputTyped<f32, { 0 + 0 }, 0>,
+    pub _out1: OutputTyped<f32, { 0 + 1 }, 0>,
   }
 
   #[test]

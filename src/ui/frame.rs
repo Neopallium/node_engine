@@ -1,6 +1,6 @@
+use crate::GetId;
 #[cfg(feature = "egui")]
 use crate::ui::*;
-use crate::GetId;
 
 #[derive(Clone, Debug)]
 pub struct NodeFrameStyle {
@@ -201,7 +201,7 @@ pub trait NodeFrame: GetId {
     resp.context_menu(|ui| {
       if ui.button("Delete").clicked() {
         action = Some(NodeAction::Delete(false));
-        ui.close_menu();
+        ui.close_kind(egui::UiKind::Menu);
       }
     });
     action
@@ -226,7 +226,12 @@ pub trait NodeFrame: GetId {
     rect = graph.node_to_ui(rect);
 
     // Use child UI for frame.
-    let mut child_ui = ui.child_ui_with_id_source(rect, *ui.layout(), self.id(), None);
+    let mut child_ui = ui.new_child(
+      egui::UiBuilder::new()
+        .id_salt(self.id())
+        .max_rect(rect)
+        .layout(*ui.layout()),
+    );
     let ui = &mut child_ui;
 
     // Allocate a response for the whole frame area.

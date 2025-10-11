@@ -2,9 +2,9 @@ use core::fmt;
 
 use uuid::Uuid;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
-use serde::{de::Deserializer, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, de::Deserializer};
 
 #[cfg(feature = "egui")]
 use crate::ui::*;
@@ -487,7 +487,7 @@ impl NodeFrame for Node {
   }
 
   fn contents_ui(&mut self, ui: &mut egui::Ui, node_style: NodeStyle) {
-    egui::Frame::none()
+    egui::Frame::new()
       .fill(egui::Color32::from_gray(63))
       .show(ui, |ui| {
         ui.set_min_width(node_style.node_min_size.x);
@@ -518,13 +518,13 @@ impl NodeFrame for Node {
     resp.context_menu(|ui| {
       if ui.button("Delete").clicked() {
         action = Some(NodeAction::Delete(false));
-        ui.close_menu();
+        ui.close_kind(egui::UiKind::Menu);
       }
       if !self.group_id.is_nil() {
         if ui.button("Remove from group").clicked() {
           action = Some(NodeAction::LeaveGroup(self.group_id));
           self.group_id = Uuid::nil();
-          ui.close_menu();
+          ui.close_kind(egui::UiKind::Menu);
         }
       }
     });

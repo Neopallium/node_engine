@@ -89,15 +89,15 @@ impl NodeFrame for NodeGroup {
     resp.context_menu(|ui| {
       if ui.button("Add selected nodes").clicked() {
         action = Some(NodeAction::JoinGroup(self.id));
-        ui.close_menu();
+        ui.close_kind(egui::UiKind::Menu);
       }
       if ui.button("Delete group").clicked() {
         action = Some(NodeAction::Delete(false));
-        ui.close_menu();
+        ui.close_kind(egui::UiKind::Menu);
       }
       if ui.button("Delete group and nodes").clicked() {
         action = Some(NodeAction::Delete(true));
-        ui.close_menu();
+        ui.close_kind(egui::UiKind::Menu);
       }
     });
     action

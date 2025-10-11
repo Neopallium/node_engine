@@ -1,6 +1,6 @@
 use glam::{Vec2, Vec3, Vec4};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 #[cfg(feature = "egui")]
 use egui::color_picker;
@@ -270,7 +270,7 @@ impl ValueType for UV {
 
   #[cfg(feature = "egui")]
   fn ui(&mut self, ui: &mut egui::Ui) -> bool {
-    egui::ComboBox::from_id_source("UV Channel")
+    egui::ComboBox::from_id_salt("UV Channel")
       .selected_text(format!("{:?}", self.1))
       .show_ui(ui, |ui| {
         ui.selectable_value(&mut self.1, UvChannel::UV0, "UV0")

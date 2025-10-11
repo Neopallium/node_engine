@@ -6,9 +6,9 @@ use uuid::Uuid;
 
 use indexmap::IndexMap;
 
-use serde::{de::Deserializer, ser::SerializeSeq, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, de::Deserializer, ser::SerializeSeq};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 #[cfg(feature = "egui")]
 use crate::ui::*;
@@ -596,7 +596,11 @@ impl NodeGraph {
     let (size, origin, scroll_offset, zoom) = self.editor.get_zoomed();
     // Create scroll area and restore zoomed scroll offset.
     let scroll_area = egui::ScrollArea::both()
-      .enable_scrolling(scrolling)
+      .scroll_source(egui::containers::scroll_area::ScrollSource {
+        scroll_bar: true,
+        drag: scrolling,
+        mouse_wheel: false,
+      })
       .scroll_offset(scroll_offset);
 
     // Show scroll area.
@@ -765,7 +769,7 @@ impl NodeGraph {
 
     if let Some(resp) = out.inner {
       resp.context_menu(|ui| self.context_menu(ui));
-      if !ui.ctx().is_context_menu_open() {
+      if !ui.ctx().is_popup_open() {
         self.menu_state = None;
       }
     }
@@ -780,18 +784,18 @@ impl NodeGraph {
       .clone();
     if ui.button("Create node").clicked() {
       self.open_node_finder(ui);
-      ui.close_menu();
+      ui.close_kind(egui::UiKind::Menu);
     }
     if self.has_selected() && ui.button("Group Nodes").clicked() {
       self.group_selected_nodes();
-      ui.close_menu();
+      ui.close_kind(egui::UiKind::Menu);
     }
     if let Some(input) = state.hover_connection {
       if ui.button("Delete connection").clicked() {
         if let Err(err) = self.disconnect(input) {
           log::error!("Failed to delete connection: {err:?}");
         }
-        ui.close_menu();
+        ui.close_kind(egui::UiKind::Menu);
       }
     }
   }
