@@ -17,6 +17,7 @@ cargo run --release --example test_graph_ui
 
 ## Versions
 
+- Bevy 0.17: `node_engine = "0.7"`
 - Bevy 0.16: `node_engine = "0.6"`
 - Bevy 0.15: `node_engine = "0.5"`
 - Bevy 0.14: `node_engine = "0.4"`
